@@ -4,6 +4,10 @@
 
 Create a stable WordPress plugin MVP that captures supported form submissions, normalizes them as Bono lead source submissions, and sends them to the Bono API without breaking the WordPress site when optional integrations are unavailable.
 
+Submissions now include normalized contact detection and validation using:
+
+`name && (phone || email)`
+
 ## Files Created Or Modified
 
 - `bono-leads-connector.php`
@@ -29,6 +33,9 @@ Create a stable WordPress plugin MVP that captures supported form submissions, n
 6. Install and activate Contact Form 7, submit a test form, and verify Bono receives a normalized payload at `/wordpress/submissions`.
 7. Install Elementor Pro Forms later, submit a test form, and verify Bono receives a normalized payload at `/wordpress/submissions`.
 8. Install WPForms later, submit a test form, and verify Bono receives a normalized payload at `/wordpress/submissions`.
+9. Verify invalid submissions are skipped and not sent when `name` is missing.
+10. Verify invalid submissions are skipped and not sent when both `phone` and `email` are missing.
+11. Verify raw submitted fields are still present under `payload.fields` when `payload.contact` is detected.
 
 ## Open Questions
 

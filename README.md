@@ -51,6 +51,44 @@ Examples:
 
 Bono backend remains responsible for deciding whether the Source is connected to an active Campaign.
 
+## Contact Validation Rule
+
+Submission validation rule:
+
+`Name && (Phone || Email)`
+
+- A submission is sent to Bono only when `contact.name` exists and at least one of `contact.phone` or `contact.email` exists.
+- Invalid submissions are skipped gracefully and do not break the form flow.
+- Raw form fields remain in `payload.fields` even when normalized contact fields are also detected.
+
+Supported field alias families for smart detection include:
+
+- Name: `name`, `full_name`, `fullname`, `your-name`, `contact_name`, `customer_name`, `first_name` + `last_name`, Hebrew variants like `שם`, `שם מלא`, `שם פרטי` + `שם משפחה`
+- Email: `email`, `your-email`, `e-mail`, `email_address`, `emailaddress`, `mail`, `contact_email`, Hebrew variants like `דואל`, `דוא"ל`, `אימייל`, `מייל`
+- Phone: `phone`, `tel`, `telephone`, `mobile`, `cellphone`, `cell`, `phone_number`, `your-phone`, `contact_phone`, Hebrew variants like `מספר טלפון`, `טלפון`, `נייד`, `פלאפון`
+
+Example normalized payload fields:
+
+```json
+{
+  "fields": {
+    "your-name": "Tal Ohana",
+    "your-email": "tal@example.com",
+    "your-phone": "054-444-3618"
+  },
+  "contact": {
+    "name": "Tal Ohana",
+    "email": "tal@example.com",
+    "phone": "0544443618"
+  },
+  "validation": {
+    "isValid": true,
+    "missing": [],
+    "rule": "name && (phone || email)"
+  }
+}
+```
+
 ## Provider Testing
 
 Contact Form 7:
