@@ -25,6 +25,13 @@ class Bono_Plugin {
     private $api_client = null;
 
     /**
+     * Submission queue.
+     *
+     * @var Bono_Submission_Queue|null
+     */
+    private $submission_queue = null;
+
+    /**
      * Load dependencies and register hooks.
      *
      * @return void
@@ -41,7 +48,46 @@ class Bono_Plugin {
             $this->api_client = new Bono_API_Client();
         }
 
+        if (
+            $this->api_client instanceof Bono_API_Client &&
+            class_exists('Bono_Submission_Queue')
+        ) {
+            $this->submission_queue = new Bono_Submission_Queue($this->api_client);
+            $this->submission_queue->register_hooks();
+            $this->submission_queue->schedule_cron();
+        }
+
         add_action('plugins_loaded', array($this, 'initialize_integrations'));
+    }
+
+    /**
+     * Activation callback.
+     *
+     * @return void
+     */
+    public static function activate() {
+        self::load_core_dependencies();
+
+        if (class_exists('Bono_API_Client') && class_exists('Bono_Submission_Queue')) {
+            $queue = new Bono_Submission_Queue(new Bono_API_Client());
+            $queue->register_hooks();
+            $queue->create_table();
+            $queue->schedule_cron();
+        }
+    }
+
+    /**
+     * Deactivation callback.
+     *
+     * @return void
+     */
+    public static function deactivate() {
+        self::load_core_dependencies();
+
+        if (class_exists('Bono_API_Client') && class_exists('Bono_Submission_Queue')) {
+            $queue = new Bono_Submission_Queue(new Bono_API_Client());
+            $queue->unschedule_cron();
+        }
     }
 
     /**
@@ -54,6 +100,7 @@ class Bono_Plugin {
             'includes/class-bono-settings.php',
             'includes/class-bono-api-client.php',
             'includes/class-bono-form-capture.php',
+            'includes/class-bono-submission-queue.php',
         );
 
         foreach ($core_files as $file) {
@@ -84,6 +131,28 @@ class Bono_Plugin {
     }
 
     /**
+     * Load core class files for lifecycle hooks.
+     *
+     * @return void
+     */
+    private static function load_core_dependencies() {
+        $core_files = array(
+            'includes/class-bono-settings.php',
+            'includes/class-bono-api-client.php',
+            'includes/class-bono-form-capture.php',
+            'includes/class-bono-submission-queue.php',
+        );
+
+        foreach ($core_files as $file) {
+            $path = BONO_PLUGIN_PATH . $file;
+
+            if (file_exists($path)) {
+                require_once $path;
+            }
+        }
+    }
+
+    /**
      * Initialize optional form integrations after other plugins load.
      *
      * @return void
@@ -94,17 +163,17 @@ class Bono_Plugin {
         }
 
         if (class_exists('Bono_CF7_Capture')) {
-            $cf7_capture = new Bono_CF7_Capture($this->api_client);
+            $cf7_capture = new Bono_CF7_Capture($this->api_client, $this->submission_queue);
             $cf7_capture->register_hooks();
         }
 
         if (class_exists('Bono_Elementor_Capture')) {
-            $elementor_capture = new Bono_Elementor_Capture($this->api_client);
+            $elementor_capture = new Bono_Elementor_Capture($this->api_client, $this->submission_queue);
             $elementor_capture->register_hooks();
         }
 
         if (class_exists('Bono_WPForms_Capture')) {
-            $wpforms_capture = new Bono_WPForms_Capture($this->api_client);
+            $wpforms_capture = new Bono_WPForms_Capture($this->api_client, $this->submission_queue);
             $wpforms_capture->register_hooks();
         }
     }

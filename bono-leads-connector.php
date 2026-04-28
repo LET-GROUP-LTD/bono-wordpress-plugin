@@ -22,6 +22,9 @@ if (file_exists($bono_plugin_class_file)) {
     require_once $bono_plugin_class_file;
 
     if (class_exists('Bono_Plugin')) {
+        register_activation_hook(__FILE__, array('Bono_Plugin', 'activate'));
+        register_deactivation_hook(__FILE__, array('Bono_Plugin', 'deactivate'));
+
         $bono_plugin = new Bono_Plugin();
         $bono_plugin->run();
     }

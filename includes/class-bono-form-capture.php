@@ -18,12 +18,24 @@ class Bono_Form_Capture {
     protected $api_client;
 
     /**
+     * Submission queue.
+     *
+     * @var Bono_Submission_Queue|null
+     */
+    protected $submission_queue;
+
+    /**
      * Constructor.
      *
-     * @param Bono_API_Client $api_client Bono API client.
+     * @param Bono_API_Client            $api_client Bono API client.
+     * @param Bono_Submission_Queue|null $submission_queue Queue service.
      */
-    public function __construct(Bono_API_Client $api_client) {
+    public function __construct(Bono_API_Client $api_client, $submission_queue = null) {
         $this->api_client = $api_client;
+        $this->submission_queue = (
+            class_exists('Bono_Submission_Queue') &&
+            $submission_queue instanceof Bono_Submission_Queue
+        ) ? $submission_queue : null;
     }
 
     /**
@@ -283,8 +295,17 @@ class Bono_Form_Capture {
 
         $idempotency_key = isset($payload['idempotencyKey']) ? sanitize_text_field((string) $payload['idempotencyKey']) : '';
         $transient_key = '' !== $idempotency_key ? 'bono_submission_' . $idempotency_key : '';
+        $exists_in_queue = (
+            '' !== $idempotency_key &&
+            class_exists('Bono_Submission_Queue') &&
+            $this->submission_queue instanceof Bono_Submission_Queue &&
+            $this->submission_queue->has_idempotency_key($idempotency_key)
+        );
 
-        if ('' !== $transient_key && get_transient($transient_key)) {
+        if (
+            ('' !== $transient_key && get_transient($transient_key)) ||
+            $exists_in_queue
+        ) {
             $this->debug_log(
                 __('Duplicate submission skipped', 'bono-leads-connector'),
                 array(
@@ -295,6 +316,23 @@ class Bono_Form_Capture {
             );
             return;
         }
+
+        $source_key = isset($payload['sourceKey']) ? sanitize_text_field((string) $payload['sourceKey']) : '';
+
+        if ($this->is_rate_limited($source_key)) {
+            $this->debug_log(
+                __('Submission skipped: source rate limit exceeded', 'bono-leads-connector'),
+                array(
+                    'provider' => isset($payload['provider']) ? $payload['provider'] : '',
+                    'sourceKey' => $source_key,
+                    'idempotencyKey' => $idempotency_key,
+                    'error' => 'source_rate_limit_exceeded',
+                )
+            );
+            return;
+        }
+
+        $this->increment_rate_limit($source_key);
 
         $result = $this->api_client->send_submission($payload);
 
@@ -309,11 +347,92 @@ class Bono_Form_Capture {
                     'idempotencyKey' => $idempotency_key,
                 )
             );
+
+            if (
+                class_exists('Bono_Submission_Queue') &&
+                $this->submission_queue instanceof Bono_Submission_Queue
+            ) {
+                $queue_error = isset($result['error']) ? $result['error'] : __('Bono submission failed.', 'bono-leads-connector');
+                $this->submission_queue->enqueue($payload, $queue_error);
+            }
         }
 
         if ('' !== $transient_key) {
             set_transient($transient_key, '1', 5 * MINUTE_IN_SECONDS);
         }
+    }
+
+    /**
+     * Determine whether a source key has exceeded the short rate limit.
+     *
+     * @param string $source_key Source key.
+     * @return bool
+     */
+    protected function is_rate_limited($source_key) {
+        $source_key = sanitize_text_field((string) $source_key);
+
+        if ('' === $source_key) {
+            return false;
+        }
+
+        $state = get_transient($this->get_rate_limit_transient_key($source_key));
+        $count = is_array($state) && isset($state['count']) ? (int) $state['count'] : 0;
+
+        return $count >= $this->get_rate_limit_max_submissions();
+    }
+
+    /**
+     * Increment the source-key rate limit counter.
+     *
+     * @param string $source_key Source key.
+     * @return void
+     */
+    protected function increment_rate_limit($source_key) {
+        $source_key = sanitize_text_field((string) $source_key);
+
+        if ('' === $source_key) {
+            return;
+        }
+
+        $transient_key = $this->get_rate_limit_transient_key($source_key);
+        $state = get_transient($transient_key);
+        $count = is_array($state) && isset($state['count']) ? (int) $state['count'] : 0;
+
+        set_transient(
+            $transient_key,
+            array(
+                'count' => $count + 1,
+            ),
+            $this->get_rate_limit_window_seconds()
+        );
+    }
+
+    /**
+     * Build rate-limit transient key without storing raw source key.
+     *
+     * @param string $source_key Source key.
+     * @return string
+     */
+    private function get_rate_limit_transient_key($source_key) {
+        return 'bono_rate_' . hash('sha256', sanitize_text_field((string) $source_key));
+    }
+
+    /**
+     * Get max valid submissions per source key during the rate window.
+     *
+     * @return int
+     */
+    private function get_rate_limit_max_submissions() {
+        return 20;
+    }
+
+    /**
+     * Get rate-limit window in seconds.
+     *
+     * @return int
+     */
+    private function get_rate_limit_window_seconds() {
+        return 5 * MINUTE_IN_SECONDS;
     }
 
     /**

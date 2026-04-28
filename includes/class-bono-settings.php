@@ -21,6 +21,10 @@ class Bono_Settings {
         add_action('admin_menu', array($this, 'add_settings_page'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_post_bono_test_api_connection', array($this, 'handle_test_api_connection'));
+        add_action('admin_post_bono_retry_failed_submissions', array($this, 'handle_retry_failed_submissions'));
+        add_action('admin_post_bono_process_queue_now', array($this, 'handle_process_queue_now'));
+        add_action('admin_post_bono_delete_sent_queue_rows', array($this, 'handle_delete_sent_queue_rows'));
+        add_action('admin_post_bono_delete_failed_queue_rows', array($this, 'handle_delete_failed_queue_rows'));
     }
 
     /**
@@ -291,6 +295,8 @@ class Bono_Settings {
             return;
         }
 
+        $queue_counts = $this->get_queue_counts();
+        $queue_latest_failed = $this->get_queue_latest_failed();
         $settings_page = BONO_PLUGIN_PATH . 'admin/settings-page.php';
 
         if (file_exists($settings_page)) {
@@ -322,6 +328,114 @@ class Bono_Settings {
             : $this->get_test_error_message($result);
 
         $this->redirect_after_test($success, isset($result['status_code']) ? $result['status_code'] : null, $message);
+    }
+
+    /**
+     * Retry failed queued submissions.
+     *
+     * @return void
+     */
+    public function handle_retry_failed_submissions() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to retry failed submissions.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_retry_failed_submissions');
+
+        if (!class_exists('Bono_Submission_Queue') || !class_exists('Bono_API_Client')) {
+            $this->redirect_after_queue_action('error', __('Bono queue service is unavailable.', 'bono-leads-connector'));
+        }
+
+        $queue = new Bono_Submission_Queue(new Bono_API_Client());
+        $updated = $queue->retry_failed();
+        $message = sprintf(
+            /* translators: %d: number of submissions moved to retrying. */
+            __('Marked %d failed submissions for retry.', 'bono-leads-connector'),
+            (int) $updated
+        );
+
+        $this->redirect_after_queue_action('success', $message);
+    }
+
+    /**
+     * Process queued submissions once.
+     *
+     * @return void
+     */
+    public function handle_process_queue_now() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to process the queue.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_process_queue_now');
+
+        if (!class_exists('Bono_Submission_Queue') || !class_exists('Bono_API_Client')) {
+            $this->redirect_after_queue_action('error', __('Bono queue service is unavailable.', 'bono-leads-connector'));
+        }
+
+        $queue = new Bono_Submission_Queue(new Bono_API_Client());
+        $processed = $queue->process_queue();
+        $message = sprintf(
+            /* translators: %d: number of queued rows processed. */
+            __('Processed %d queued submissions.', 'bono-leads-connector'),
+            (int) $processed
+        );
+
+        $this->redirect_after_queue_action('success', $message);
+    }
+
+    /**
+     * Delete sent queue rows.
+     *
+     * @return void
+     */
+    public function handle_delete_sent_queue_rows() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to delete sent queue rows.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_delete_sent_queue_rows');
+
+        if (!class_exists('Bono_Submission_Queue') || !class_exists('Bono_API_Client')) {
+            $this->redirect_after_queue_action('error', __('Bono queue service is unavailable.', 'bono-leads-connector'));
+        }
+
+        $queue = new Bono_Submission_Queue(new Bono_API_Client());
+        $deleted = $queue->delete_sent();
+        $message = sprintf(
+            /* translators: %d: deleted row count. */
+            __('Deleted %d sent queue rows.', 'bono-leads-connector'),
+            (int) $deleted
+        );
+
+        $this->redirect_after_queue_action('success', $message);
+    }
+
+    /**
+     * Delete failed queue rows.
+     *
+     * @return void
+     */
+    public function handle_delete_failed_queue_rows() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to delete failed queue rows.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_delete_failed_queue_rows');
+
+        if (!class_exists('Bono_Submission_Queue') || !class_exists('Bono_API_Client')) {
+            $this->redirect_after_queue_action('error', __('Bono queue service is unavailable.', 'bono-leads-connector'));
+        }
+
+        $queue = new Bono_Submission_Queue(new Bono_API_Client());
+        $deleted = $queue->delete_failed();
+        $message = sprintf(
+            /* translators: %d: deleted row count. */
+            __('Deleted %d failed queue rows.', 'bono-leads-connector'),
+            (int) $deleted
+        );
+
+        $this->redirect_after_queue_action('success', $message);
     }
 
     /**
@@ -357,6 +471,72 @@ class Bono_Settings {
                 'bono_test_status' => $success ? 'success' : 'error',
                 'bono_test_code' => is_null($status_code) ? '' : (string) (int) $status_code,
                 'bono_test_message' => (string) $message,
+            ),
+            admin_url('options-general.php')
+        );
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    /**
+     * Get queue counters for admin visibility.
+     *
+     * @return array
+     */
+    private function get_queue_counts() {
+        $defaults = array(
+            'pending' => 0,
+            'retrying' => 0,
+            'sent' => 0,
+            'failed' => 0,
+            'latest_failed_at' => '',
+            'oldest_pending_age' => null,
+            'health' => array(
+                'state' => 'healthy',
+                'label' => __('Healthy', 'bono-leads-connector'),
+                'description' => __('No failed submissions and pending queue is under 10.', 'bono-leads-connector'),
+            ),
+        );
+
+        if (!class_exists('Bono_Submission_Queue') || !class_exists('Bono_API_Client')) {
+            return $defaults;
+        }
+
+        $queue = new Bono_Submission_Queue(new Bono_API_Client());
+        $counts = $queue->get_counts();
+
+        return wp_parse_args(is_array($counts) ? $counts : array(), $defaults);
+    }
+
+    /**
+     * Get latest failed queue rows for admin visibility.
+     *
+     * @return array
+     */
+    private function get_queue_latest_failed() {
+        if (!class_exists('Bono_Submission_Queue') || !class_exists('Bono_API_Client')) {
+            return array();
+        }
+
+        $queue = new Bono_Submission_Queue(new Bono_API_Client());
+
+        return $queue->get_latest_failed(5);
+    }
+
+    /**
+     * Redirect back to settings page with queue action notice.
+     *
+     * @param string $status  success or error.
+     * @param string $message User-facing message.
+     * @return void
+     */
+    private function redirect_after_queue_action($status, $message) {
+        $redirect_url = add_query_arg(
+            array(
+                'page' => 'bono-leads-connector',
+                'bono_queue_status' => 'success' === $status ? 'success' : 'error',
+                'bono_queue_message' => (string) $message,
             ),
             admin_url('options-general.php')
         );

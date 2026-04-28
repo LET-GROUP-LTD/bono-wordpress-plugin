@@ -64,7 +64,50 @@ Submission validation rule:
 - Raw form fields remain in `payload.fields` even when normalized contact fields are also detected.
 - Valid submissions include an `idempotencyKey` generated from provider, source key, form/page identifiers, email/phone, and the submitted minute bucket. Raw field values and the API key are not part of this key.
 - Rapid duplicates with the same idempotency key are suppressed locally for 5 minutes using a WordPress transient.
-- Durable retry/queue handling is still future work; failed submissions are not replayed yet.
+- Valid submissions are rate-limited per `sourceKey` before sending or queueing. Default limit is 20 submissions per 5 minutes per `sourceKey`.
+- If immediate delivery fails, the submission is stored in a durable WordPress queue table and retried by WP-Cron.
+
+## Durable Queue + Retry
+
+Failed deliveries are persisted in:
+
+`{wp_prefix}bono_submission_queue`
+
+Queue statuses:
+
+- `pending`
+- `retrying`
+- `sent`
+- `failed`
+
+Processing behavior:
+
+- Capture flow still tries immediate send first.
+- On failure, submission is queued with the same `idempotencyKey`.
+- WP-Cron processes up to 10 due rows every 5 minutes.
+- Retry backoff is 5, 15, 30, then 60 minutes.
+- After 5 total attempts, status becomes `failed`.
+
+Settings page now includes a queue section with counts and admin controls:
+
+- Queue health: `Healthy`, `Warning`, or `Critical`
+- Oldest pending age
+- Latest failed timestamp
+- Latest 5 failed errors using safe metadata only
+- `Retry Failed Submissions` marks failed rows as retrying with immediate next attempt.
+- `Process Queue Now` runs the worker once manually.
+- `Delete Sent Queue Rows` removes completed queue rows.
+- `Delete Failed Queue Rows (Destructive)` removes failed queue rows.
+
+This queue is intentionally lightweight and uses WordPress APIs only (no Action Scheduler).
+
+Queue health states:
+
+- `Healthy`: no failed rows and pending count is under 10.
+- `Warning`: failed count is greater than 0 or pending count is 10 or more.
+- `Critical`: failed count is 10 or more, or oldest pending row is older than 1 hour.
+
+Privacy note: the admin queue view never displays payload, contact values, raw fields, or API keys. Latest failed errors show only created/updated timestamps, provider, source key, attempts, and sanitized error text.
 
 Supported field alias families for smart detection include:
 
@@ -114,3 +157,11 @@ WPForms:
 1. Install and activate WPForms.
 2. Add a WPForms form to a WordPress page.
 3. Submit the form and verify the mock API receives `POST /wordpress/submissions` with provider `wpforms`.
+
+## Uninstall behavior
+
+By default, uninstall removes plugin options but keeps queue data.
+
+To drop the queue table on uninstall, define:
+
+`BONO_DROP_DATA_ON_UNINSTALL` as `true`.
