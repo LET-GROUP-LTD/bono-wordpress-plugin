@@ -14,7 +14,7 @@ Captures supported WordPress form submissions and sends normalized lead source p
 
 Bono Leads Connector is a standalone WordPress plugin for sending supported WordPress form submissions to the Bono API.
 
-The MVP supports Contact Form 7 and Elementor Pro Forms when those plugins are installed. Missing integrations are skipped safely.
+The MVP supports Contact Form 7, Elementor Pro Forms, and WPForms when those plugins are installed. Missing integrations are skipped safely.
 
 == Installation ==
 

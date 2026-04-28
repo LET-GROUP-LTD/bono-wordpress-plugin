@@ -99,7 +99,7 @@ class Bono_Form_Capture {
             }
         }
 
-        return $utm;
+        return empty($utm) ? new stdClass() : $utm;
     }
 
     /**
@@ -112,7 +112,7 @@ class Bono_Form_Capture {
         $normalized = array();
 
         foreach ($fields as $key => $value) {
-            $field_key = sanitize_key($key);
+            $field_key = $this->normalize_field_key($key);
 
             if ('' === $field_key || 0 === strpos($field_key, '_')) {
                 continue;
@@ -160,13 +160,33 @@ class Bono_Form_Capture {
      * @return array
      */
     protected function build_payload($provider, $form_id, $form_name, array $fields, $page_id = null, $page_url = null) {
+        return $this->build_submission_payload($provider, $form_id, $form_name, $fields, $page_id, $page_url);
+    }
+
+    /**
+     * Build the normalized submission payload shared by all providers.
+     *
+     * @param string      $provider Provider slug.
+     * @param string      $form_id Form ID.
+     * @param string      $form_name Form display name.
+     * @param array       $fields Submitted fields.
+     * @param string|null $page_id Page ID.
+     * @param string|null $page_url Page URL.
+     * @return array
+     */
+    protected function build_submission_payload($provider, $form_id, $form_name, array $fields, $page_id = null, $page_url = null) {
         $page_id = $this->get_page_id($page_id);
         $page_url = $this->get_page_url($page_url);
+        $form_id = sanitize_text_field((string) $form_id);
+
+        if ('' === $form_id) {
+            $form_id = 'form_unknown';
+        }
 
         return array(
             'provider' => sanitize_key($provider),
             'sourceKey' => $this->create_source_key($provider, $form_id, $page_id),
-            'formId' => sanitize_text_field((string) $form_id),
+            'formId' => $form_id,
             'formName' => sanitize_text_field((string) $form_name),
             'pageId' => $page_id,
             'pageUrl' => $page_url,
@@ -226,6 +246,24 @@ class Bono_Form_Capture {
     }
 
     /**
+     * Log provider capture metadata without field values.
+     *
+     * @param string $message Capture message.
+     * @param array  $payload Normalized payload.
+     * @return void
+     */
+    protected function log_submission_captured($message, array $payload) {
+        $this->debug_log(
+            $message,
+            array(
+                'sourceKey' => isset($payload['sourceKey']) ? $payload['sourceKey'] : '',
+                'formId' => isset($payload['formId']) ? $payload['formId'] : '',
+                'pageId' => isset($payload['pageId']) ? $payload['pageId'] : '',
+            )
+        );
+    }
+
+    /**
      * Normalize page ID to the source key format.
      *
      * @param int|string $page_id Page ID.
@@ -256,7 +294,7 @@ class Bono_Form_Capture {
             $normalized = array();
 
             foreach ($value as $key => $item) {
-                $normalized[sanitize_key($key)] = $this->normalize_value($item);
+                $normalized[$this->normalize_field_key($key)] = $this->normalize_value($item);
             }
 
             return $normalized;
@@ -271,6 +309,18 @@ class Bono_Form_Capture {
         }
 
         return sanitize_textarea_field((string) $value);
+    }
+
+    /**
+     * Normalize field keys while preserving custom field names where possible.
+     *
+     * @param int|string $key Raw field key.
+     * @return string
+     */
+    private function normalize_field_key($key) {
+        $key = sanitize_text_field((string) $key);
+
+        return preg_replace('/[\x00-\x1F\x7F]/', '', $key);
     }
 
     /**

@@ -48,7 +48,7 @@ class Bono_CF7_Capture extends Bono_Form_Capture {
         $page_id = $this->get_cf7_page_id($submission);
         $page_url = $this->get_cf7_page_url($submission);
 
-        $payload = $this->build_payload(
+        $payload = $this->build_submission_payload(
             'cf7',
             $form_id,
             $form_name,
@@ -57,7 +57,7 @@ class Bono_CF7_Capture extends Bono_Form_Capture {
             $page_url
         );
 
-        $this->debug_log(__('CF7 submission captured before mail send', 'bono-leads-connector'));
+        $this->log_submission_captured(__('CF7 submission captured before mail send', 'bono-leads-connector'), $payload);
         $this->send_payload($payload);
     }
 

@@ -29,8 +29,9 @@ The MVP stores the API key in the WordPress options table as plain text. The sto
 
 - Contact Form 7
 - Elementor Pro Forms
+- WPForms
 
-Both integrations are optional. If either plugin is not installed, Bono Leads Connector skips that integration without causing activation errors.
+All integrations are optional. If a supported form plugin is not installed, Bono Leads Connector skips that integration without causing activation errors.
 
 ## Submission Behavior
 
@@ -46,5 +47,26 @@ Examples:
 
 - `cf7:123:page_45`
 - `elementor:contact_form:page_88`
+- `wpforms:15:page_9`
 
 Bono backend remains responsible for deciding whether the Source is connected to an active Campaign.
+
+## Provider Testing
+
+Contact Form 7:
+
+1. Install and activate Contact Form 7.
+2. Add a CF7 form to a WordPress page.
+3. Submit the form and verify the mock API receives `POST /wordpress/submissions`.
+
+Elementor Pro Forms:
+
+1. Install and activate Elementor Pro.
+2. Add an Elementor form to a WordPress page.
+3. Submit the form and verify the mock API receives `POST /wordpress/submissions` with provider `elementor`.
+
+WPForms:
+
+1. Install and activate WPForms.
+2. Add a WPForms form to a WordPress page.
+3. Submit the form and verify the mock API receives `POST /wordpress/submissions` with provider `wpforms`.

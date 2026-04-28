@@ -47,7 +47,7 @@ class Bono_Elementor_Capture extends Bono_Form_Capture {
         $page_id = $this->get_elementor_page_id($record);
         $page_url = $this->get_elementor_page_url($record);
 
-        $payload = $this->build_payload(
+        $payload = $this->build_submission_payload(
             'elementor',
             $form_id,
             $form_name,
@@ -56,6 +56,7 @@ class Bono_Elementor_Capture extends Bono_Form_Capture {
             $page_url
         );
 
+        $this->log_submission_captured(__('Elementor submission captured', 'bono-leads-connector'), $payload);
         $this->send_payload($payload);
     }
 
@@ -99,6 +100,10 @@ class Bono_Elementor_Capture extends Bono_Form_Capture {
             if (is_array($field)) {
                 if (!empty($field['id'])) {
                     $field_key = sanitize_key($field['id']);
+                } elseif (!empty($field['title'])) {
+                    $field_key = sanitize_text_field($field['title']);
+                } elseif (!empty($field['label'])) {
+                    $field_key = sanitize_text_field($field['label']);
                 }
 
                 if (array_key_exists('value', $field)) {
@@ -125,6 +130,12 @@ class Bono_Elementor_Capture extends Bono_Form_Capture {
      * @return string|null
      */
     private function get_elementor_page_id($record) {
+        $page_id = $record->get('page_id');
+
+        if (!empty($page_id)) {
+            return $page_id;
+        }
+
         $post_id = $record->get('post_id');
 
         if (!empty($post_id)) {
@@ -149,6 +160,10 @@ class Bono_Elementor_Capture extends Bono_Form_Capture {
 
         if (is_array($meta) && !empty($meta['page_url'])) {
             return $meta['page_url'];
+        }
+
+        if (is_array($meta) && !empty($meta['referrer_url'])) {
+            return $meta['referrer_url'];
         }
 
         if (isset($_POST['referrer'])) {

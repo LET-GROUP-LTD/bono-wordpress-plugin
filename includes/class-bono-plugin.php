@@ -71,6 +71,7 @@ class Bono_Plugin {
         $integration_files = array(
             'includes/class-bono-cf7-capture.php',
             'includes/class-bono-elementor-capture.php',
+            'includes/class-bono-wpforms-capture.php',
         );
 
         foreach ($integration_files as $file) {
@@ -100,6 +101,11 @@ class Bono_Plugin {
         if (class_exists('Bono_Elementor_Capture')) {
             $elementor_capture = new Bono_Elementor_Capture($this->api_client);
             $elementor_capture->register_hooks();
+        }
+
+        if (class_exists('Bono_WPForms_Capture')) {
+            $wpforms_capture = new Bono_WPForms_Capture($this->api_client);
+            $wpforms_capture->register_hooks();
         }
     }
 }
