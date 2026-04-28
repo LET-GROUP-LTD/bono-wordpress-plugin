@@ -53,6 +53,43 @@ class Bono_Settings {
     }
 
     /**
+     * Determine whether an API base URL is allowed for outbound requests.
+     *
+     * @param string $api_base_url API base URL.
+     * @return bool
+     */
+    public static function is_allowed_api_base_url($api_base_url) {
+        $api_base_url = esc_url_raw(trim((string) $api_base_url));
+
+        if ('' === $api_base_url) {
+            return false;
+        }
+
+        $parts = wp_parse_url($api_base_url);
+
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+
+        if ('https' === $scheme) {
+            return true;
+        }
+
+        if ('http' !== $scheme) {
+            return false;
+        }
+
+        return in_array(
+            $host,
+            array('localhost', '127.0.0.1', 'host.docker.internal'),
+            true
+        );
+    }
+
+    /**
      * Add settings page under Settings.
      *
      * @return void
@@ -131,12 +168,37 @@ class Bono_Settings {
      */
     public function sanitize_settings($input) {
         $input = is_array($input) ? $input : array();
+        $existing = self::get_settings();
+        $api_base_url = isset($input['api_base_url']) && is_scalar($input['api_base_url'])
+            ? esc_url_raw(trim((string) $input['api_base_url']))
+            : '';
+        $api_key = isset($input['api_key']) && is_scalar($input['api_key'])
+            ? sanitize_text_field((string) $input['api_key'])
+            : '';
+        $site_id = isset($input['site_id']) && is_scalar($input['site_id'])
+            ? sanitize_text_field((string) $input['site_id'])
+            : '';
+
+        if ('' !== $api_base_url && !self::is_allowed_api_base_url($api_base_url)) {
+            if (function_exists('add_settings_error')) {
+                add_settings_error(
+                    self::OPTION_KEY,
+                    'bono_insecure_api_base_url',
+                    __('API Base URL must use https://, except http://localhost, http://127.0.0.1, or http://host.docker.internal for local development.', 'bono-leads-connector'),
+                    'error'
+                );
+            }
+
+            $api_base_url = !empty($existing['api_base_url']) && self::is_allowed_api_base_url($existing['api_base_url'])
+                ? $existing['api_base_url']
+                : '';
+        }
 
         return array(
-            'api_base_url' => isset($input['api_base_url']) ? esc_url_raw(trim($input['api_base_url'])) : '',
+            'api_base_url' => $api_base_url,
             // Stored as plain text for MVP. Keep this isolated for later encryption or secret storage hardening.
-            'api_key' => isset($input['api_key']) ? sanitize_text_field($input['api_key']) : '',
-            'site_id' => isset($input['site_id']) ? sanitize_text_field($input['site_id']) : '',
+            'api_key' => '' !== $api_key ? $api_key : (isset($existing['api_key']) ? $existing['api_key'] : ''),
+            'site_id' => $site_id,
             'enable_debug_log' => !empty($input['enable_debug_log']),
         );
     }
@@ -166,14 +228,19 @@ class Bono_Settings {
      */
     public function render_api_key_field() {
         $settings = self::get_settings();
+        $has_api_key = !empty($settings['api_key']);
         ?>
         <input
             type="password"
             class="regular-text"
             name="<?php echo esc_attr(self::OPTION_KEY); ?>[api_key]"
-            value="<?php echo esc_attr($settings['api_key']); ?>"
+            value=""
+            placeholder="<?php echo esc_attr($has_api_key ? '••••••••••••' : ''); ?>"
             autocomplete="off"
         />
+        <?php if ($has_api_key) : ?>
+            <p class="description"><?php esc_html_e('Leave blank to keep the existing API key.', 'bono-leads-connector'); ?></p>
+        <?php endif; ?>
         <?php
     }
 

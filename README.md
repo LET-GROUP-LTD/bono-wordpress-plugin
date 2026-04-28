@@ -23,7 +23,9 @@ Configure:
 - Site ID
 - Debug Logging
 
-The MVP stores the API key in the WordPress options table as plain text. The storage is isolated in `Bono_Settings` so it can be hardened later.
+Production API Base URLs must use `https://`. Local development may use `http://localhost`, `http://127.0.0.1`, or `http://host.docker.internal` so Docker-based WordPress can reach local services such as `http://host.docker.internal:3000`.
+
+The MVP stores the API key in the WordPress options table as plain text. The settings UI masks saved keys and leaves the existing key unchanged when the field is submitted empty. The storage is isolated in `Bono_Settings` so it can be hardened later.
 
 ## Supported MVP Integrations
 
@@ -60,6 +62,9 @@ Submission validation rule:
 - A submission is sent to Bono only when `contact.name` exists and at least one of `contact.phone` or `contact.email` exists.
 - Invalid submissions are skipped gracefully and do not break the form flow.
 - Raw form fields remain in `payload.fields` even when normalized contact fields are also detected.
+- Valid submissions include an `idempotencyKey` generated from provider, source key, form/page identifiers, email/phone, and the submitted minute bucket. Raw field values and the API key are not part of this key.
+- Rapid duplicates with the same idempotency key are suppressed locally for 5 minutes using a WordPress transient.
+- Durable retry/queue handling is still future work; failed submissions are not replayed yet.
 
 Supported field alias families for smart detection include:
 
@@ -85,7 +90,8 @@ Example normalized payload fields:
     "isValid": true,
     "missing": [],
     "rule": "name && (phone || email)"
-  }
+  },
+  "idempotencyKey": "..."
 }
 ```
 

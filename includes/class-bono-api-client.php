@@ -23,6 +23,10 @@ class Bono_API_Client {
             return $this->result(false, null, null, __('Missing Bono API settings.', 'bono-leads-connector'));
         }
 
+        if (!$this->is_allowed_api_base_url($settings['api_base_url'])) {
+            return $this->result(false, null, null, __('Insecure API Base URL is not allowed.', 'bono-leads-connector'));
+        }
+
         $endpoint = $this->build_endpoint($settings['api_base_url'], '/wordpress/submissions');
 
         if (empty($endpoint)) {
@@ -42,6 +46,10 @@ class Bono_API_Client {
 
         if (empty($settings['api_base_url']) || empty($settings['api_key']) || empty($settings['site_id'])) {
             return $this->result(false, null, null, __('Missing Bono API settings.', 'bono-leads-connector'));
+        }
+
+        if (!$this->is_allowed_api_base_url($settings['api_base_url'])) {
+            return $this->result(false, null, null, __('Insecure API Base URL is not allowed.', 'bono-leads-connector'));
         }
 
         $endpoint = $this->build_endpoint($settings['api_base_url'], '/wordpress/test');
@@ -100,11 +108,82 @@ class Bono_API_Client {
     private function build_endpoint($api_base_url, $path) {
         $api_base_url = esc_url_raw(trim($api_base_url));
 
-        if (empty($api_base_url)) {
+        if (empty($api_base_url) || !$this->is_allowed_api_base_url($api_base_url)) {
             return '';
         }
 
         return untrailingslashit($api_base_url) . $path;
+    }
+
+    /**
+     * Determine whether an API base URL is allowed for outbound requests.
+     *
+     * @param string $api_base_url API base URL.
+     * @return bool
+     */
+    private function is_allowed_api_base_url($api_base_url) {
+        if (class_exists('Bono_Settings') && method_exists('Bono_Settings', 'is_allowed_api_base_url')) {
+            return Bono_Settings::is_allowed_api_base_url($api_base_url);
+        }
+
+        $api_base_url = esc_url_raw(trim((string) $api_base_url));
+
+        if ('' === $api_base_url) {
+            return false;
+        }
+
+        $parts = wp_parse_url($api_base_url);
+
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+
+        if ('https' === $scheme) {
+            return true;
+        }
+
+        if ('http' !== $scheme) {
+            return false;
+        }
+
+        return in_array(
+            $host,
+            array('localhost', '127.0.0.1', 'host.docker.internal'),
+            true
+        );
+    }
+
+    /**
+     * Determine whether an API base URL is an allowed local development URL.
+     *
+     * @param string $api_base_url API base URL.
+     * @return bool
+     */
+    private function is_allowed_local_development_api_base_url($api_base_url) {
+        $api_base_url = esc_url_raw(trim((string) $api_base_url));
+
+        if ('' === $api_base_url) {
+            return false;
+        }
+
+        $parts = wp_parse_url($api_base_url);
+
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+
+        if ('http' !== strtolower((string) $parts['scheme'])) {
+            return false;
+        }
+
+        return in_array(
+            strtolower((string) $parts['host']),
+            array('localhost', '127.0.0.1', 'host.docker.internal'),
+            true
+        );
     }
 
     /**
@@ -122,19 +201,33 @@ class Bono_API_Client {
             __('Sending Bono API request.', 'bono-leads-connector'),
             array(
                 'request_type' => $request_type,
-                'endpoint' => $endpoint,
+                'idempotencyKey' => isset($payload['idempotencyKey']) ? $payload['idempotencyKey'] : '',
             )
+        );
+
+        $headers = array(
+            'Content-Type' => 'application/json',
+            'X-Bono-Api-Key' => $settings['api_key'],
+            'X-Bono-Site-Id' => $settings['site_id'],
+            'X-Bono-Plugin-Version' => defined('BONO_PLUGIN_VERSION') ? BONO_PLUGIN_VERSION : '',
+        );
+
+        if (!empty($payload['idempotencyKey'])) {
+            $headers['X-Bono-Idempotency-Key'] = $payload['idempotencyKey'];
+        }
+
+        $reject_unsafe_urls = !$this->is_allowed_local_development_api_base_url(
+            isset($settings['api_base_url']) ? $settings['api_base_url'] : ''
         );
 
         $response = wp_remote_post(
             $endpoint,
             array(
                 'timeout' => 10,
-                'headers' => array(
-                    'Content-Type' => 'application/json',
-                    'X-Bono-Api-Key' => $settings['api_key'],
-                    'X-Bono-Site-Id' => $settings['site_id'],
-                ),
+                'redirection' => 0,
+                'blocking' => true,
+                'reject_unsafe_urls' => $reject_unsafe_urls,
+                'headers' => $headers,
                 'body' => wp_json_encode($payload),
             )
         );
@@ -147,6 +240,7 @@ class Bono_API_Client {
                 array(
                     'request_type' => $request_type,
                     'error' => $error,
+                    'idempotencyKey' => isset($payload['idempotencyKey']) ? $payload['idempotencyKey'] : '',
                 )
             );
 
@@ -163,6 +257,7 @@ class Bono_API_Client {
                 'request_type' => $request_type,
                 'status_code' => $status_code,
                 'success' => $success ? 'true' : 'false',
+                'idempotencyKey' => isset($payload['idempotencyKey']) ? $payload['idempotencyKey'] : '',
             )
         );
 
@@ -205,8 +300,27 @@ class Bono_API_Client {
      */
     private function normalize_log_context(array $context) {
         $normalized = array();
+        $allowed_keys = array(
+            'provider',
+            'sourceKey',
+            'formId',
+            'pageId',
+            'status_code',
+            'success',
+            'error',
+            'idempotencyKey',
+        );
 
         foreach ($context as $key => $value) {
+            if (!in_array($key, $allowed_keys, true)) {
+                continue;
+            }
+
+            if ('idempotencyKey' === $key) {
+                $normalized[sanitize_key($key)] = substr(sanitize_text_field((string) $value), 0, 8);
+                continue;
+            }
+
             $normalized[sanitize_key($key)] = is_scalar($value) || is_null($value)
                 ? sanitize_text_field((string) $value)
                 : '[non_scalar]';

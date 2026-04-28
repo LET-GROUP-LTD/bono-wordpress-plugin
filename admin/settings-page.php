@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) {
 <div class="wrap">
     <h1><?php esc_html_e('Bono Leads Connector', 'bono-leads-connector'); ?></h1>
     <p><?php esc_html_e('Connect this WordPress site to Bono and send form submissions as lead sources.', 'bono-leads-connector'); ?></p>
+    <?php settings_errors('bono_leads_connector_settings'); ?>
 
     <?php if (isset($_GET['bono_test_status'], $_GET['bono_test_message'])) : ?>
         <?php

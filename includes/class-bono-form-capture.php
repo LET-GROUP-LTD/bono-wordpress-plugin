@@ -186,7 +186,7 @@ class Bono_Form_Capture {
             $form_id = 'form_unknown';
         }
 
-        return array(
+        $payload = array(
             'provider' => sanitize_key($provider),
             'sourceKey' => $this->create_source_key($provider, $form_id, $page_id),
             'formId' => $form_id,
@@ -203,6 +203,37 @@ class Bono_Form_Capture {
                 'pluginVersion' => defined('BONO_PLUGIN_VERSION') ? BONO_PLUGIN_VERSION : '',
             ),
         );
+
+        $payload['idempotencyKey'] = $this->create_idempotency_key($payload);
+
+        return $payload;
+    }
+
+    /**
+     * Create a deterministic idempotency key without including raw form fields.
+     *
+     * @param array $payload Normalized payload.
+     * @return string
+     */
+    protected function create_idempotency_key($payload) {
+        $contact = isset($payload['contact']) && is_array($payload['contact']) ? $payload['contact'] : array();
+        $submitted_at = isset($payload['submittedAt']) ? strtotime((string) $payload['submittedAt']) : time();
+
+        if (false === $submitted_at) {
+            $submitted_at = time();
+        }
+
+        $parts = array(
+            'provider' => isset($payload['provider']) ? sanitize_key($payload['provider']) : '',
+            'sourceKey' => isset($payload['sourceKey']) ? sanitize_text_field((string) $payload['sourceKey']) : '',
+            'formId' => isset($payload['formId']) ? sanitize_text_field((string) $payload['formId']) : '',
+            'pageId' => isset($payload['pageId']) ? sanitize_text_field((string) $payload['pageId']) : '',
+            'email' => isset($contact['email']) ? strtolower(sanitize_email((string) $contact['email'])) : '',
+            'phone' => isset($contact['phone']) ? sanitize_text_field((string) $contact['phone']) : '',
+            'submittedAtMinute' => gmdate('Y-m-d\TH:i', $submitted_at),
+        );
+
+        return hash('sha256', wp_json_encode($parts));
     }
 
     /**
@@ -243,7 +274,23 @@ class Bono_Form_Capture {
                 array(
                     'provider' => isset($payload['provider']) ? $payload['provider'] : '',
                     'sourceKey' => isset($payload['sourceKey']) ? $payload['sourceKey'] : '',
-                    'missing' => isset($validation['missing']) ? wp_json_encode($validation['missing']) : '',
+                    'error' => 'missing_required_contact_fields',
+                    'idempotencyKey' => isset($payload['idempotencyKey']) ? $payload['idempotencyKey'] : '',
+                )
+            );
+            return;
+        }
+
+        $idempotency_key = isset($payload['idempotencyKey']) ? sanitize_text_field((string) $payload['idempotencyKey']) : '';
+        $transient_key = '' !== $idempotency_key ? 'bono_submission_' . $idempotency_key : '';
+
+        if ('' !== $transient_key && get_transient($transient_key)) {
+            $this->debug_log(
+                __('Duplicate submission skipped', 'bono-leads-connector'),
+                array(
+                    'provider' => isset($payload['provider']) ? $payload['provider'] : '',
+                    'sourceKey' => isset($payload['sourceKey']) ? $payload['sourceKey'] : '',
+                    'idempotencyKey' => $idempotency_key,
                 )
             );
             return;
@@ -259,8 +306,13 @@ class Bono_Form_Capture {
                     'sourceKey' => isset($payload['sourceKey']) ? $payload['sourceKey'] : '',
                     'status_code' => isset($result['status_code']) ? $result['status_code'] : null,
                     'error' => isset($result['error']) ? $result['error'] : null,
+                    'idempotencyKey' => $idempotency_key,
                 )
             );
+        }
+
+        if ('' !== $transient_key) {
+            set_transient($transient_key, '1', 5 * MINUTE_IN_SECONDS);
         }
     }
 
@@ -278,6 +330,7 @@ class Bono_Form_Capture {
                 'sourceKey' => isset($payload['sourceKey']) ? $payload['sourceKey'] : '',
                 'formId' => isset($payload['formId']) ? $payload['formId'] : '',
                 'pageId' => isset($payload['pageId']) ? $payload['pageId'] : '',
+                'idempotencyKey' => isset($payload['idempotencyKey']) ? $payload['idempotencyKey'] : '',
             )
         );
     }
@@ -513,8 +566,27 @@ class Bono_Form_Capture {
      */
     private function normalize_log_context(array $context) {
         $normalized = array();
+        $allowed_keys = array(
+            'provider',
+            'sourceKey',
+            'formId',
+            'pageId',
+            'status_code',
+            'success',
+            'error',
+            'idempotencyKey',
+        );
 
         foreach ($context as $key => $value) {
+            if (!in_array($key, $allowed_keys, true)) {
+                continue;
+            }
+
+            if ('idempotencyKey' === $key) {
+                $normalized[sanitize_key($key)] = substr(sanitize_text_field((string) $value), 0, 8);
+                continue;
+            }
+
             $normalized[sanitize_key($key)] = is_scalar($value) || is_null($value)
                 ? sanitize_text_field((string) $value)
                 : '[non_scalar]';
