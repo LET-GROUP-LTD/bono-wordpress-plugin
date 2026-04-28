@@ -24,8 +24,9 @@ Create a stable WordPress plugin MVP that captures supported form submissions, n
 2. Activate Bono Leads Connector from WordPress Admin.
 3. Open `Settings > Bono Leads`.
 4. Save API Base URL, API Key, Site ID, and Debug Logging settings.
-5. Install and activate Contact Form 7, submit a test form, and verify Bono receives a normalized payload.
-6. Install Elementor Pro Forms later, submit a test form, and verify Bono receives a normalized payload.
+5. Click `Test API Connection` and verify Bono receives a test payload at `/wordpress/test`.
+6. Install and activate Contact Form 7, submit a test form, and verify Bono receives a normalized payload.
+7. Install Elementor Pro Forms later, submit a test form, and verify Bono receives a normalized payload.
 
 ## Open Questions
 

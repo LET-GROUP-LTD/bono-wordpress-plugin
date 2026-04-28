@@ -20,6 +20,7 @@ class Bono_Settings {
     public function register_hooks() {
         add_action('admin_menu', array($this, 'add_settings_page'));
         add_action('admin_init', array($this, 'register_settings'));
+        add_action('admin_post_bono_test_api_connection', array($this, 'handle_test_api_connection'));
     }
 
     /**
@@ -228,5 +229,72 @@ class Bono_Settings {
         if (file_exists($settings_page)) {
             require $settings_page;
         }
+    }
+
+    /**
+     * Handle the Test API Connection admin action.
+     *
+     * @return void
+     */
+    public function handle_test_api_connection() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to test this connection.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_test_api_connection');
+
+        if (!class_exists('Bono_API_Client')) {
+            $this->redirect_after_test(false, null, __('Bono API client is unavailable.', 'bono-leads-connector'));
+        }
+
+        $client = new Bono_API_Client();
+        $result = $client->test_connection();
+        $success = !empty($result['success']) && 200 === (int) $result['status_code'];
+        $message = $success
+            ? __('Bono API connection succeeded.', 'bono-leads-connector')
+            : $this->get_test_error_message($result);
+
+        $this->redirect_after_test($success, isset($result['status_code']) ? $result['status_code'] : null, $message);
+    }
+
+    /**
+     * Build a user-safe test error message.
+     *
+     * @param array $result API result.
+     * @return string
+     */
+    private function get_test_error_message(array $result) {
+        if (!empty($result['error'])) {
+            return sprintf(
+                /* translators: %s: API error message. */
+                __('Bono API connection failed: %s', 'bono-leads-connector'),
+                sanitize_text_field($result['error'])
+            );
+        }
+
+        return __('Bono API connection failed.', 'bono-leads-connector');
+    }
+
+    /**
+     * Redirect back to the settings page with a test result notice.
+     *
+     * @param bool        $success Whether the test succeeded.
+     * @param int|null    $status_code HTTP status code.
+     * @param string|null $message Notice message.
+     * @return void
+     */
+    private function redirect_after_test($success, $status_code, $message) {
+        $redirect_url = add_query_arg(
+            array(
+                'page' => 'bono-leads-connector',
+                'bono_test_status' => $success ? 'success' : 'error',
+                'bono_test_code' => is_null($status_code) ? '' : (string) (int) $status_code,
+                'bono_test_message' => (string) $message,
+            ),
+            admin_url('options-general.php')
+        );
+
+        wp_safe_redirect($redirect_url);
+        exit;
     }
 }
