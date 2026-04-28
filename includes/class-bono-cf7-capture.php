@@ -20,16 +20,16 @@ class Bono_CF7_Capture extends Bono_Form_Capture {
             return;
         }
 
-        add_action('wpcf7_mail_sent', array($this, 'handle_mail_sent'), 10, 1);
+        add_action('wpcf7_before_send_mail', array($this, 'handle_before_send_mail'), 10, 1);
     }
 
     /**
-     * Handle successful CF7 mail submission.
+     * Handle CF7 submission before mail delivery.
      *
      * @param WPCF7_ContactForm $contact_form Contact form instance.
      * @return void
      */
-    public function handle_mail_sent($contact_form) {
+    public function handle_before_send_mail($contact_form) {
         if (!is_object($contact_form)) {
             return;
         }
@@ -57,6 +57,7 @@ class Bono_CF7_Capture extends Bono_Form_Capture {
             $page_url
         );
 
+        $this->debug_log(__('CF7 submission captured before mail send', 'bono-leads-connector'));
         $this->send_payload($payload);
     }
 

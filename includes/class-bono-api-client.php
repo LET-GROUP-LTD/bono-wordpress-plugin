@@ -23,7 +23,7 @@ class Bono_API_Client {
             return $this->result(false, null, null, __('Missing Bono API settings.', 'bono-leads-connector'));
         }
 
-        $endpoint = $this->build_endpoint($settings['api_base_url'], '/wordpress/submissions');
+        $endpoint = $this->build_endpoint($settings['api_base_url'], '/wordpress/lead');
 
         if (empty($endpoint)) {
             return $this->result(false, null, null, __('Invalid Bono API base URL.', 'bono-leads-connector'));
