@@ -26,6 +26,7 @@ class Bono_Settings {
         add_action('admin_menu', array($this, 'add_settings_page'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_post_bono_connect_site', array($this, 'handle_connect_site'));
+        add_action('admin_post_bono_save_field_mappings', array($this, 'handle_save_field_mappings'));
         add_action('admin_post_bono_test_api_connection', array($this, 'handle_test_api_connection'));
         add_action('admin_post_bono_retry_failed_submissions', array($this, 'handle_retry_failed_submissions'));
         add_action('admin_post_bono_process_queue_now', array($this, 'handle_process_queue_now'));
@@ -546,6 +547,39 @@ class Bono_Settings {
                 'page' => 'bono-leads-connector',
                 'bono_connect_status' => $success ? 'success' : 'error',
                 'bono_connect_message' => (string) $message,
+            ),
+            admin_url('options-general.php')
+        );
+
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    /**
+     * Handle saving per-form contact field mappings.
+     *
+     * @return void
+     */
+    public function handle_save_field_mappings() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to save field mappings.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_save_field_mappings');
+
+        $raw = isset($_POST['bono_field_mappings']) && is_array($_POST['bono_field_mappings'])
+            ? wp_unslash($_POST['bono_field_mappings'])
+            : array();
+
+        if (class_exists('Bono_Field_Mapping')) {
+            Bono_Field_Mapping::save_mappings($raw);
+        }
+
+        $redirect_url = add_query_arg(
+            array(
+                'page' => 'bono-leads-connector',
+                'bono_mapping_status' => 'success',
+                'bono_mapping_message' => __('Field mappings saved.', 'bono-leads-connector'),
             ),
             admin_url('options-general.php')
         );

@@ -101,6 +101,7 @@ class Bono_Plugin {
         $core_files = array(
             'includes/class-bono-settings.php',
             'includes/class-bono-api-client.php',
+            'includes/class-bono-field-mapping.php',
             'includes/class-bono-form-capture.php',
             'includes/class-bono-submission-queue.php',
         );
