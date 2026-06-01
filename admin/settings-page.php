@@ -195,17 +195,17 @@ if (!defined('ABSPATH')) {
     ?>
     <div class="notice <?php echo esc_attr($queue_health_class); ?> inline">
         <p>
-            <strong><?php echo esc_html(sprintf(__('Queue health: %s', 'bono-leads-connector'), $queue_health_label)); ?></strong>
+            <strong><?php echo esc_html(sprintf(/* translators: %s: queue health state label (e.g. Healthy). */ __('Queue health: %s', 'bono-leads-connector'), $queue_health_label)); ?></strong>
             <?php if ('' !== $queue_health_description) : ?>
                 <?php echo esc_html($queue_health_description); ?>
             <?php endif; ?>
         </p>
     </div>
     <ul>
-        <li><?php echo esc_html(sprintf(__('Pending: %d', 'bono-leads-connector'), (int) $queue_counts['pending'])); ?></li>
-        <li><?php echo esc_html(sprintf(__('Retrying: %d', 'bono-leads-connector'), (int) $queue_counts['retrying'])); ?></li>
-        <li><?php echo esc_html(sprintf(__('Sent: %d', 'bono-leads-connector'), (int) $queue_counts['sent'])); ?></li>
-        <li><?php echo esc_html(sprintf(__('Failed: %d', 'bono-leads-connector'), (int) $queue_counts['failed'])); ?></li>
+        <li><?php echo esc_html(sprintf(/* translators: %d: number of pending submissions. */ __('Pending: %d', 'bono-leads-connector'), (int) $queue_counts['pending'])); ?></li>
+        <li><?php echo esc_html(sprintf(/* translators: %d: number of submissions being retried. */ __('Retrying: %d', 'bono-leads-connector'), (int) $queue_counts['retrying'])); ?></li>
+        <li><?php echo esc_html(sprintf(/* translators: %d: number of successfully sent submissions. */ __('Sent: %d', 'bono-leads-connector'), (int) $queue_counts['sent'])); ?></li>
+        <li><?php echo esc_html(sprintf(/* translators: %d: number of failed submissions. */ __('Failed: %d', 'bono-leads-connector'), (int) $queue_counts['failed'])); ?></li>
         <?php if (isset($queue_counts['oldest_pending_age']) && is_numeric($queue_counts['oldest_pending_age'])) : ?>
             <li>
                 <?php
