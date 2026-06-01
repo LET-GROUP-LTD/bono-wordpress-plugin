@@ -5,6 +5,7 @@
  * Version: 0.6.0
  * Author: Bono
  * Text Domain: bono-leads-connector
+ * Domain Path: /languages
  */
 
 if (!defined('ABSPATH')) {

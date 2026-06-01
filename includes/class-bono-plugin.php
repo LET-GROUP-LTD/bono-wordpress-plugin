@@ -46,6 +46,10 @@ class Bono_Plugin {
     public function run() {
         $this->load_dependencies();
 
+        // Load bundled translations (e.g. Hebrew) from /languages. Hooked on
+        // init, the recommended point for translation loading.
+        add_action('init', array($this, 'load_textdomain'));
+
         if (class_exists('Bono_Settings')) {
             $this->settings = new Bono_Settings();
             $this->settings->register_hooks();
@@ -71,6 +75,19 @@ class Bono_Plugin {
         }
 
         add_action('plugins_loaded', array($this, 'initialize_integrations'));
+    }
+
+    /**
+     * Load the plugin text domain so bundled translations apply.
+     *
+     * @return void
+     */
+    public function load_textdomain() {
+        load_plugin_textdomain(
+            'bono-leads-connector',
+            false,
+            dirname(plugin_basename(BONO_PLUGIN_FILE)) . '/languages'
+        );
     }
 
     /**
