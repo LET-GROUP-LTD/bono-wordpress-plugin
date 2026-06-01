@@ -1,0 +1,103 @@
+name: CI
+
+# Quality gate for every pull request and every push to main. Checks the two
+# things that can actually break the plugin at runtime — PHP syntax on each
+# supported PHP version, and a resolvable / in-sync dependency graph — plus the
+# bundled JavaScript. Static analysis (PHPCS / PHPStan) and PHPUnit are tracked
+# as a P2 follow-up; they need the existing code brought up to a ruleset first
+# and would otherwise red the gate on day one.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-php:
+    name: Lint PHP (${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Mirror the composer "php": ">=7.4" constraint.
+        php: ['7.4', '8.0', '8.1', '8.2', '8.3']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Syntax-check all plugin PHP files
+        run: |
+          set -euo pipefail
+          # Lint every PHP file except vendored dependencies. -print0/-0 keeps
+          # paths with spaces safe. Any parse error fails the job.
+          find . -path ./vendor -prune -o -name '*.php' -print0 \
+            | xargs -0 -n1 -P4 php -l
+
+  composer:
+    name: Composer integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+
+      - name: Validate composer.json / composer.lock
+        # Confirms the manifest is well-formed and the lock is in sync.
+        run: composer validate --no-check-publish
+
+      - name: Install production dependencies
+        # Proves the dependency graph resolves and vendored libs are installable
+        # exactly as the release build does.
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+
+      - name: Assert every declared dependency is vendored
+        # Derived from composer.json so it stays correct as dependencies change
+        # (e.g. plugin-update-checker arrives with the self-update feature).
+        run: |
+          set -euo pipefail
+          for pkg in $(jq -r '.require | keys[] | select(. != "php")' composer.json); do
+            if [ ! -d "vendor/$pkg" ]; then
+              echo "::error::Declared dependency '$pkg' is missing from vendor/ after install."
+              exit 1
+            fi
+            echo "ok: vendor/$pkg"
+          done
+
+  lint-js:
+    name: Lint JS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax-check bundled JavaScript
+        run: |
+          set -euo pipefail
+          find ./assets -name '*.js' -print0 \
+            | xargs -0 -r -n1 node --check
