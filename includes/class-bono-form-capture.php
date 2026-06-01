@@ -191,12 +191,22 @@ class Bono_Form_Capture {
         $page_url = $this->get_page_url($page_url);
         $form_id = sanitize_text_field((string) $form_id);
         $normalized_fields = $this->normalize_fields($fields);
-        $contact = $this->detect_contact_fields($normalized_fields);
-        $validation = $this->validate_contact($contact);
 
         if ('' === $form_id) {
             $form_id = 'form_unknown';
         }
+
+        $contact = $this->detect_contact_fields($normalized_fields);
+
+        if (class_exists('Bono_Field_Mapping')) {
+            // Let an admin-defined per-form mapping override heuristic detection,
+            // then remember the form (field keys only) so it can be mapped from
+            // the settings screen after the first submission.
+            $contact = Bono_Field_Mapping::apply($provider, $form_id, $contact, $normalized_fields);
+            Bono_Field_Mapping::record_form($provider, $form_id, $form_name, array_keys($normalized_fields));
+        }
+
+        $validation = $this->validate_contact($contact);
 
         $payload = array(
             'provider' => sanitize_key($provider),

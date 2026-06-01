@@ -57,6 +57,16 @@ if (!defined('ABSPATH')) {
         </div>
     <?php endif; ?>
 
+    <?php if (isset($_GET['bono_mapping_status'], $_GET['bono_mapping_message'])) : ?>
+        <?php
+        $mapping_notice_type = 'success' === sanitize_key(wp_unslash($_GET['bono_mapping_status'])) ? 'notice-success' : 'notice-error';
+        $mapping_notice_message = sanitize_text_field(wp_unslash($_GET['bono_mapping_message']));
+        ?>
+        <div class="notice <?php echo esc_attr($mapping_notice_type); ?> is-dismissible">
+            <p><?php echo esc_html($mapping_notice_message); ?></p>
+        </div>
+    <?php endif; ?>
+
     <?php
     $bono_settings = Bono_Settings::get_settings();
     $bono_is_connected = !empty($bono_settings['site_id']) && !empty($bono_settings['api_key']);
@@ -109,6 +119,68 @@ if (!defined('ABSPATH')) {
         <input type="hidden" name="action" value="bono_test_api_connection" />
         <?php submit_button(__('Test API Connection', 'bono-leads-connector'), 'secondary', 'submit', false); ?>
     </form>
+
+    <hr />
+
+    <h2><?php esc_html_e('Field Mapping', 'bono-leads-connector'); ?></h2>
+    <p><?php esc_html_e('Bono auto-detects which field is the name, email, and phone. If a form is detected incorrectly, map its fields here. Forms appear automatically after their first submission.', 'bono-leads-connector'); ?></p>
+    <?php
+    $bono_known_forms = class_exists('Bono_Field_Mapping') ? Bono_Field_Mapping::get_known_forms() : array();
+    $bono_field_mappings = class_exists('Bono_Field_Mapping') ? Bono_Field_Mapping::get_all_mappings() : array();
+    $bono_mapping_roles = array(
+        'name' => __('Name', 'bono-leads-connector'),
+        'email' => __('Email', 'bono-leads-connector'),
+        'phone' => __('Phone', 'bono-leads-connector'),
+    );
+    ?>
+    <?php if (empty($bono_known_forms)) : ?>
+        <p><em><?php esc_html_e('No forms captured yet. Submit a form on this site once, then return here to map its fields.', 'bono-leads-connector'); ?></em></p>
+    <?php else : ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <?php wp_nonce_field('bono_save_field_mappings'); ?>
+            <input type="hidden" name="action" value="bono_save_field_mappings" />
+            <table class="widefat striped" style="max-width:900px;">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('Form', 'bono-leads-connector'); ?></th>
+                        <?php foreach ($bono_mapping_roles as $bono_role_label) : ?>
+                            <th><?php echo esc_html($bono_role_label); ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($bono_known_forms as $bono_form) : ?>
+                        <?php
+                        $bono_form_key = isset($bono_form['key']) ? (string) $bono_form['key'] : '';
+                        $bono_form_fields = isset($bono_form['fields']) && is_array($bono_form['fields']) ? $bono_form['fields'] : array();
+                        $bono_form_label = '' !== (string) $bono_form['form_name'] ? $bono_form['form_name'] : $bono_form['form_id'];
+                        $bono_current = isset($bono_field_mappings[$bono_form_key]) ? $bono_field_mappings[$bono_form_key] : array();
+                        ?>
+                        <tr>
+                            <td>
+                                <strong><?php echo esc_html($bono_form_label); ?></strong><br />
+                                <code><?php echo esc_html($bono_form['provider'] . ':' . $bono_form['form_id']); ?></code>
+                            </td>
+                            <?php foreach ($bono_mapping_roles as $bono_role => $bono_role_label) : ?>
+                                <?php $bono_selected = isset($bono_current[$bono_role]) ? (string) $bono_current[$bono_role] : ''; ?>
+                                <td>
+                                    <select name="bono_field_mappings[<?php echo esc_attr($bono_form_key); ?>][<?php echo esc_attr($bono_role); ?>]">
+                                        <option value=""><?php esc_html_e('Auto-detect', 'bono-leads-connector'); ?></option>
+                                        <?php foreach ($bono_form_fields as $bono_field) : ?>
+                                            <option value="<?php echo esc_attr($bono_field); ?>" <?php selected($bono_selected, $bono_field); ?>>
+                                                <?php echo esc_html($bono_field); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                            <?php endforeach; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php submit_button(__('Save Field Mappings', 'bono-leads-connector'), 'primary', 'submit', false); ?>
+        </form>
+    <?php endif; ?>
 
     <hr />
 
