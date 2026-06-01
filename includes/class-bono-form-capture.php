@@ -272,13 +272,32 @@ class Bono_Form_Capture {
             return;
         }
 
-        $line = '[Bono Leads Connector] ' . sanitize_text_field($message);
+        error_log($this->format_log_entry($message, $context));
+    }
 
-        if (!empty($context)) {
-            $line .= ' ' . wp_json_encode($this->normalize_log_context($context));
+    /**
+     * Format a single structured (JSON) log line for machine-parseable remote
+     * diagnosis. Context is reduced to a fixed allow-list of non-sensitive keys.
+     *
+     * @param string $message Message.
+     * @param array  $context Context.
+     * @return string
+     */
+    protected function format_log_entry($message, array $context = array()) {
+        $entry = array(
+            'plugin' => 'bono-leads-connector',
+            'version' => defined('BONO_PLUGIN_VERSION') ? BONO_PLUGIN_VERSION : '',
+            'level' => 'debug',
+            'message' => sanitize_text_field($message),
+        );
+
+        $normalized_context = $this->normalize_log_context($context);
+
+        if (!empty($normalized_context)) {
+            $entry['context'] = $normalized_context;
         }
 
-        error_log($line);
+        return '[Bono Leads Connector] ' . wp_json_encode($entry);
     }
 
     /**

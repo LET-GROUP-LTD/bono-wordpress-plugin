@@ -32,6 +32,13 @@ class Bono_Plugin {
     private $submission_queue = null;
 
     /**
+     * Status REST endpoint.
+     *
+     * @var Bono_Status_Endpoint|null
+     */
+    private $status_endpoint = null;
+
+    /**
      * Load dependencies and register hooks.
      *
      * @return void
@@ -56,6 +63,11 @@ class Bono_Plugin {
             // register_hooks() schedules the recurring sweep on `init` (the
             // Action-Scheduler-safe point), so no direct scheduling call here.
             $this->submission_queue->register_hooks();
+        }
+
+        if (class_exists('Bono_Status_Endpoint')) {
+            $this->status_endpoint = new Bono_Status_Endpoint($this->submission_queue);
+            $this->status_endpoint->register_hooks();
         }
 
         add_action('plugins_loaded', array($this, 'initialize_integrations'));
@@ -104,6 +116,7 @@ class Bono_Plugin {
             'includes/class-bono-field-mapping.php',
             'includes/class-bono-form-capture.php',
             'includes/class-bono-submission-queue.php',
+            'includes/class-bono-status-endpoint.php',
         );
 
         foreach ($core_files as $file) {

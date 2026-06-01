@@ -20,3 +20,4 @@ require $bono_includes . '/class-bono-gravity-capture.php';
 require $bono_includes . '/class-bono-fluent-capture.php';
 require $bono_includes . '/class-bono-forminator-capture.php';
 require $bono_includes . '/class-bono-settings.php';
+require $bono_includes . '/class-bono-status-endpoint.php';
