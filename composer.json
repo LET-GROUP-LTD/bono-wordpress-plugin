@@ -1,0 +1,16 @@
+{
+    "name": "bono/leads-connector",
+    "description": "Captures WordPress form submissions and delivers them to Bono.",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "require": {
+        "php": ">=7.4",
+        "woocommerce/action-scheduler": "^3.8"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "composer/installers": true
+        }
+    }
+}

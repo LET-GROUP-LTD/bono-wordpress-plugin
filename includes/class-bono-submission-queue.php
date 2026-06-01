@@ -16,9 +16,29 @@ class Bono_Submission_Queue {
     const CRON_HOOK = 'bono_process_submission_queue';
 
     /**
-     * Retry schedule name.
+     * Retry schedule name (WP-Cron fallback).
      */
     const CRON_SCHEDULE = 'bono_every_five_minutes';
+
+    /**
+     * Action Scheduler group for this plugin's actions.
+     */
+    const SCHEDULER_GROUP = 'bono-leads-connector';
+
+    /**
+     * Queue sweep interval in seconds (5 minutes).
+     */
+    const SWEEP_INTERVAL = 300;
+
+    /**
+     * Days to retain successfully sent rows before auto-pruning (audit window).
+     */
+    const RETENTION_SENT_DAYS = 7;
+
+    /**
+     * Days to retain dead-lettered (failed) rows before auto-pruning.
+     */
+    const RETENTION_FAILED_DAYS = 30;
 
     /**
      * Queue table name.
@@ -51,8 +71,29 @@ class Bono_Submission_Queue {
      * @return void
      */
     public function register_hooks() {
-        add_filter('cron_schedules', array($this, 'add_cron_schedule'));
+        // The processing callback is bound by hook name, so it works whether the
+        // sweep is triggered by Action Scheduler or by the WP-Cron fallback.
         add_action(self::CRON_HOOK, array($this, 'process_queue'));
+
+        // Schedule the recurring sweep on init, the safe point after Action
+        // Scheduler has initialized its data store. Guarded against duplicates.
+        add_action('init', array($this, 'schedule_cron'));
+
+        if (!$this->is_action_scheduler_available()) {
+            add_filter('cron_schedules', array($this, 'add_cron_schedule'));
+        }
+    }
+
+    /**
+     * Whether Action Scheduler is loaded and usable.
+     *
+     * @return bool
+     */
+    private function is_action_scheduler_available() {
+        return function_exists('as_schedule_recurring_action')
+            && function_exists('as_enqueue_async_action')
+            && function_exists('as_has_scheduled_action')
+            && function_exists('as_unschedule_all_actions');
     }
 
     /**
@@ -105,23 +146,69 @@ class Bono_Submission_Queue {
     }
 
     /**
-     * Schedule queue processing cron job.
+     * Schedule the recurring queue sweep (Action Scheduler, WP-Cron fallback).
      *
      * @return void
      */
     public function schedule_cron() {
+        if ($this->is_action_scheduler_available()) {
+            if (!as_has_scheduled_action(self::CRON_HOOK, array(), self::SCHEDULER_GROUP)) {
+                as_schedule_recurring_action(
+                    time() + self::SWEEP_INTERVAL,
+                    self::SWEEP_INTERVAL,
+                    self::CRON_HOOK,
+                    array(),
+                    self::SCHEDULER_GROUP
+                );
+            }
+
+            // Remove any stale WP-Cron event left over from a pre-Action-Scheduler install.
+            if (wp_next_scheduled(self::CRON_HOOK)) {
+                wp_clear_scheduled_hook(self::CRON_HOOK);
+            }
+
+            return;
+        }
+
         if (!wp_next_scheduled(self::CRON_HOOK)) {
-            wp_schedule_event(time() + (5 * MINUTE_IN_SECONDS), self::CRON_SCHEDULE, self::CRON_HOOK);
+            wp_schedule_event(time() + self::SWEEP_INTERVAL, self::CRON_SCHEDULE, self::CRON_HOOK);
         }
     }
 
     /**
-     * Unschedule queue processing cron job.
+     * Unschedule the recurring queue sweep.
      *
      * @return void
      */
     public function unschedule_cron() {
+        if ($this->is_action_scheduler_available()) {
+            as_unschedule_all_actions(self::CRON_HOOK, array(), self::SCHEDULER_GROUP);
+        }
+
+        // Always clear the WP-Cron event too, covering fallback installs and migrations.
         wp_clear_scheduled_hook(self::CRON_HOOK);
+    }
+
+    /**
+     * Trigger a prompt, one-off queue sweep without waiting for the recurring tick.
+     *
+     * Uses an Action Scheduler async action so a failed submission is retried via
+     * the post-request loopback within seconds, instead of waiting up to 5 minutes
+     * (or for site traffic to fire WP-Cron). No-op without Action Scheduler.
+     *
+     * @return void
+     */
+    public function trigger_async_processing() {
+        if (!$this->is_action_scheduler_available()) {
+            return;
+        }
+
+        // Avoid piling up duplicate async sweeps when several submissions fail at once.
+        if (as_has_scheduled_action(self::CRON_HOOK, array(), self::SCHEDULER_GROUP . '-async')) {
+            return;
+        }
+
+        as_enqueue_async_action(self::CRON_HOOK, array(), self::SCHEDULER_GROUP . '-async');
     }
 
     /**
@@ -265,7 +352,10 @@ class Bono_Submission_Queue {
     public function process_queue() {
         global $wpdb;
 
-        $now = current_time('mysql');
+        // next_attempt_at is stored in GMT (see enqueue()/calculate_next_attempt()),
+        // so compare against GMT now. Using local time here bypassed the retry
+        // backoff entirely in non-UTC timezones (e.g. Israel, GMT+3).
+        $now = current_time('mysql', true);
         $rows = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT id, idempotency_key, payload, attempts FROM {$this->table_name}
@@ -308,7 +398,46 @@ class Bono_Submission_Queue {
             );
         }
 
+        $this->cleanup_expired();
+
         return $processed;
+    }
+
+    /**
+     * Prune old terminal rows so the queue table does not grow unbounded.
+     *
+     * Sent rows are kept as a short audit window; failed rows (dead letters)
+     * are kept longer for inspection before being removed. Timestamps match
+     * how created_at/updated_at are stored (site-local via current_time).
+     *
+     * @return int Number of rows deleted.
+     */
+    public function cleanup_expired() {
+        global $wpdb;
+
+        $now_local = current_time('timestamp');
+        $sent_cutoff = gmdate('Y-m-d H:i:s', $now_local - (self::RETENTION_SENT_DAYS * DAY_IN_SECONDS));
+        $failed_cutoff = gmdate('Y-m-d H:i:s', $now_local - (self::RETENTION_FAILED_DAYS * DAY_IN_SECONDS));
+
+        $deleted = 0;
+
+        $deleted += (int) $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$this->table_name} WHERE status = %s AND updated_at < %s",
+                'sent',
+                $sent_cutoff
+            )
+        );
+
+        $deleted += (int) $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$this->table_name} WHERE status = %s AND updated_at < %s",
+                'failed',
+                $failed_cutoff
+            )
+        );
+
+        return $deleted;
     }
 
     /**

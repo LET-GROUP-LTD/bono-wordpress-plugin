@@ -47,6 +47,53 @@ if (!defined('ABSPATH')) {
         </div>
     <?php endif; ?>
 
+    <?php if (isset($_GET['bono_connect_status'], $_GET['bono_connect_message'])) : ?>
+        <?php
+        $connect_notice_type = 'success' === sanitize_key(wp_unslash($_GET['bono_connect_status'])) ? 'notice-success' : 'notice-error';
+        $connect_notice_message = sanitize_text_field(wp_unslash($_GET['bono_connect_message']));
+        ?>
+        <div class="notice <?php echo esc_attr($connect_notice_type); ?> is-dismissible">
+            <p><?php echo esc_html($connect_notice_message); ?></p>
+        </div>
+    <?php endif; ?>
+
+    <?php
+    $bono_settings = Bono_Settings::get_settings();
+    $bono_is_connected = !empty($bono_settings['site_id']) && !empty($bono_settings['api_key']);
+    ?>
+    <h2><?php esc_html_e('Connect to Bono', 'bono-leads-connector'); ?></h2>
+    <?php if ($bono_is_connected) : ?>
+        <p>
+            <span class="dashicons dashicons-yes-alt" style="color:#46b450;"></span>
+            <?php
+            printf(
+                /* translators: %s: Bono site ID. */
+                esc_html__('This site is connected to Bono (Site ID: %s). Reconnect with a new token to rotate credentials.', 'bono-leads-connector'),
+                '<code>' . esc_html($bono_settings['site_id']) . '</code>'
+            );
+            ?>
+        </p>
+    <?php else : ?>
+        <p><?php esc_html_e('Generate a connection token in your Bono workspace settings, then paste it here to connect this site automatically.', 'bono-leads-connector'); ?></p>
+    <?php endif; ?>
+    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+        <?php wp_nonce_field('bono_connect_site'); ?>
+        <input type="hidden" name="action" value="bono_connect_site" />
+        <input
+            type="text"
+            class="regular-text"
+            name="bono_provisioning_token"
+            value=""
+            placeholder="<?php echo esc_attr__('Paste your Bono connection token', 'bono-leads-connector'); ?>"
+            autocomplete="off"
+        />
+        <?php submit_button($bono_is_connected ? __('Reconnect', 'bono-leads-connector') : __('Connect', 'bono-leads-connector'), 'primary', 'submit', false); ?>
+    </form>
+
+    <hr />
+
+    <h2><?php esc_html_e('Manual configuration', 'bono-leads-connector'); ?></h2>
+    <p><?php esc_html_e('Advanced: configure the API connection manually instead of using a connection token.', 'bono-leads-connector'); ?></p>
     <form method="post" action="options.php">
         <?php
         settings_fields('bono_leads_connector');
@@ -66,7 +113,7 @@ if (!defined('ABSPATH')) {
     <hr />
 
     <h2><?php esc_html_e('Submission Queue', 'bono-leads-connector'); ?></h2>
-    <p><?php esc_html_e('Failed submissions are stored and retried by WP-Cron.', 'bono-leads-connector'); ?></p>
+    <p><?php esc_html_e('Failed submissions are stored and retried automatically in the background (Action Scheduler, with a WP-Cron fallback).', 'bono-leads-connector'); ?></p>
     <?php
     $queue_health = isset($queue_counts['health']) && is_array($queue_counts['health']) ? $queue_counts['health'] : array();
     $queue_health_state = isset($queue_health['state']) ? sanitize_key($queue_health['state']) : 'healthy';

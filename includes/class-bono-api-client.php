@@ -72,6 +72,99 @@ class Bono_API_Client {
     }
 
     /**
+     * Exchange a single-use provisioning token for a site_id + API key.
+     *
+     * Authenticated by the provisioning token in the body (no API key header).
+     *
+     * @param string $provisioning_token Provisioning token from the Bono app.
+     * @param string $api_base_url       Bono API base URL to register against.
+     * @return array { success, site_id, api_key, status_code, error }
+     */
+    public function register_site($provisioning_token, $api_base_url) {
+        $provisioning_token = trim((string) $provisioning_token);
+
+        if ('' === $provisioning_token) {
+            return $this->register_result(false, null, null, null, __('Provisioning token is required.', 'bono-leads-connector'));
+        }
+
+        if (!$this->is_allowed_api_base_url($api_base_url)) {
+            return $this->register_result(false, null, null, null, __('Insecure or invalid API Base URL is not allowed.', 'bono-leads-connector'));
+        }
+
+        $endpoint = $this->build_endpoint($api_base_url, '/wordpress/sites/register');
+
+        if (empty($endpoint)) {
+            return $this->register_result(false, null, null, null, __('Invalid Bono API base URL.', 'bono-leads-connector'));
+        }
+
+        $payload = array(
+            'provisioningToken' => $provisioning_token,
+            'site' => array(
+                'url' => home_url(),
+                'name' => get_bloginfo('name'),
+            ),
+            'pluginVersion' => defined('BONO_PLUGIN_VERSION') ? BONO_PLUGIN_VERSION : '',
+        );
+
+        $reject_unsafe_urls = !$this->is_allowed_local_development_api_base_url($api_base_url);
+
+        $response = wp_remote_post(
+            $endpoint,
+            array(
+                'timeout' => 15,
+                'redirection' => 0,
+                'blocking' => true,
+                'reject_unsafe_urls' => $reject_unsafe_urls,
+                'headers' => array(
+                    'Content-Type' => 'application/json',
+                    'X-Bono-Plugin-Version' => defined('BONO_PLUGIN_VERSION') ? BONO_PLUGIN_VERSION : '',
+                ),
+                'body' => wp_json_encode($payload),
+            )
+        );
+
+        if (is_wp_error($response)) {
+            return $this->register_result(false, null, null, null, $response->get_error_message());
+        }
+
+        $status_code = (int) wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $site_id = is_array($body) && isset($body['site_id']) ? sanitize_text_field((string) $body['site_id']) : '';
+        $api_key = is_array($body) && isset($body['api_key']) ? sanitize_text_field((string) $body['api_key']) : '';
+        $succeeded = 200 === $status_code && is_array($body) && !empty($body['success']) && '' !== $site_id && '' !== $api_key;
+
+        if (!$succeeded) {
+            $message = is_array($body) && !empty($body['message'])
+                ? sanitize_text_field((string) $body['message'])
+                : __('Bono rejected the connection request.', 'bono-leads-connector');
+
+            return $this->register_result(false, $status_code, null, null, $message);
+        }
+
+        return $this->register_result(true, $status_code, $site_id, $api_key, null);
+    }
+
+    /**
+     * Build a structured register_site result.
+     *
+     * @param bool        $success     Whether registration succeeded.
+     * @param int|null    $status_code HTTP status code.
+     * @param string|null $site_id     Issued site ID.
+     * @param string|null $api_key     Issued API key.
+     * @param string|null $error       Error message.
+     * @return array
+     */
+    private function register_result($success, $status_code, $site_id, $api_key, $error) {
+        return array(
+            'success' => (bool) $success,
+            'status_code' => $status_code,
+            'site_id' => $site_id,
+            'api_key' => $api_key,
+            'error' => $error,
+        );
+    }
+
+    /**
      * Get settings from the settings class when available.
      *
      * @return array

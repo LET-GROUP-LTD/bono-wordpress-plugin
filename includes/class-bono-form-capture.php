@@ -353,7 +353,12 @@ class Bono_Form_Capture {
                 $this->submission_queue instanceof Bono_Submission_Queue
             ) {
                 $queue_error = isset($result['error']) ? $result['error'] : __('Bono submission failed.', 'bono-leads-connector');
-                $this->submission_queue->enqueue($payload, $queue_error);
+
+                if ($this->submission_queue->enqueue($payload, $queue_error)) {
+                    // Retry promptly via the post-request loopback instead of waiting
+                    // for the recurring sweep or for site traffic to fire WP-Cron.
+                    $this->submission_queue->trigger_async_processing();
+                }
             }
         }
 

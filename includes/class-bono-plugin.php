@@ -53,8 +53,9 @@ class Bono_Plugin {
             class_exists('Bono_Submission_Queue')
         ) {
             $this->submission_queue = new Bono_Submission_Queue($this->api_client);
+            // register_hooks() schedules the recurring sweep on `init` (the
+            // Action-Scheduler-safe point), so no direct scheduling call here.
             $this->submission_queue->register_hooks();
-            $this->submission_queue->schedule_cron();
         }
 
         add_action('plugins_loaded', array($this, 'initialize_integrations'));
@@ -70,9 +71,10 @@ class Bono_Plugin {
 
         if (class_exists('Bono_API_Client') && class_exists('Bono_Submission_Queue')) {
             $queue = new Bono_Submission_Queue(new Bono_API_Client());
-            $queue->register_hooks();
             $queue->create_table();
-            $queue->schedule_cron();
+            // The recurring sweep is scheduled on the next normal load via the
+            // `init` hook (Action-Scheduler-safe); avoids scheduling too early
+            // during activation before Action Scheduler's store is ready.
         }
     }
 

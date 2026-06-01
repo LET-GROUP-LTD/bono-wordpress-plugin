@@ -13,6 +13,11 @@ class Bono_Settings {
     const OPTION_KEY = 'bono_leads_connector_settings';
 
     /**
+     * Envelope prefix marking a value as encrypted at rest.
+     */
+    const SECRET_PREFIX = 'bono:enc:v1:';
+
+    /**
      * Register WordPress hooks.
      *
      * @return void
@@ -20,6 +25,7 @@ class Bono_Settings {
     public function register_hooks() {
         add_action('admin_menu', array($this, 'add_settings_page'));
         add_action('admin_init', array($this, 'register_settings'));
+        add_action('admin_post_bono_connect_site', array($this, 'handle_connect_site'));
         add_action('admin_post_bono_test_api_connection', array($this, 'handle_test_api_connection'));
         add_action('admin_post_bono_retry_failed_submissions', array($this, 'handle_retry_failed_submissions'));
         add_action('admin_post_bono_process_queue_now', array($this, 'handle_process_queue_now'));
@@ -53,7 +59,136 @@ class Bono_Settings {
             $settings = array();
         }
 
-        return wp_parse_args($settings, self::get_defaults());
+        $settings = wp_parse_args($settings, self::get_defaults());
+
+        // Decrypt the API key transparently so all consumers receive plaintext.
+        // Legacy plaintext values (no envelope prefix) pass through unchanged and
+        // are re-encrypted on the next save.
+        if (isset($settings['api_key'])) {
+            $settings['api_key'] = self::decrypt_secret($settings['api_key']);
+        }
+
+        return $settings;
+    }
+
+    /**
+     * Whether authenticated encryption is available for secret storage.
+     *
+     * @return bool
+     */
+    private static function is_encryption_available() {
+        return function_exists('sodium_crypto_secretbox')
+            && function_exists('sodium_crypto_secretbox_open')
+            && function_exists('hash_hkdf')
+            && function_exists('random_bytes')
+            && defined('SODIUM_CRYPTO_SECRETBOX_KEYBYTES')
+            && defined('SODIUM_CRYPTO_SECRETBOX_NONCEBYTES');
+    }
+
+    /**
+     * Derive a 32-byte encryption key from the site's wp-config salts.
+     *
+     * The key material lives in wp-config (or WordPress-generated salts), never
+     * in the database, so a database dump alone does not expose stored secrets.
+     *
+     * @return string Raw 32-byte key.
+     */
+    private static function get_encryption_key() {
+        $salt = function_exists('wp_salt') ? wp_salt('secure_auth') : '';
+
+        return hash_hkdf('sha256', $salt, SODIUM_CRYPTO_SECRETBOX_KEYBYTES, 'bono-leads-connector:apikey:v1');
+    }
+
+    /**
+     * Encrypt a secret for storage at rest.
+     *
+     * Returns an empty string unchanged. When encryption is unavailable the
+     * plaintext is returned as-is (graceful degradation, never lose the secret).
+     *
+     * @param string $plaintext Secret value.
+     * @return string Encrypted envelope or original value.
+     */
+    public static function encrypt_secret($plaintext) {
+        $plaintext = (string) $plaintext;
+
+        if ('' === $plaintext || !self::is_encryption_available()) {
+            return $plaintext;
+        }
+
+        $key = self::get_encryption_key();
+        $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $cipher = sodium_crypto_secretbox($plaintext, $nonce, $key);
+
+        if (function_exists('sodium_memzero')) {
+            sodium_memzero($key);
+        }
+
+        return self::SECRET_PREFIX . base64_encode($nonce . $cipher);
+    }
+
+    /**
+     * Decrypt a stored secret.
+     *
+     * Values without the envelope prefix are treated as legacy plaintext and
+     * returned unchanged. A failed decryption (tampering or rotated salts)
+     * yields an empty string so the admin is prompted to re-enter the key.
+     *
+     * @param string $stored Stored value.
+     * @return string Plaintext secret.
+     */
+    public static function decrypt_secret($stored) {
+        $stored = (string) $stored;
+
+        if ('' === $stored || 0 !== strpos($stored, self::SECRET_PREFIX)) {
+            return $stored;
+        }
+
+        if (!self::is_encryption_available()) {
+            return '';
+        }
+
+        $raw = base64_decode(substr($stored, strlen(self::SECRET_PREFIX)), true);
+
+        if (false === $raw || strlen($raw) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+            return '';
+        }
+
+        $nonce = substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $cipher = substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        $key = self::get_encryption_key();
+        $plaintext = sodium_crypto_secretbox_open($cipher, $nonce, $key);
+
+        if (function_exists('sodium_memzero')) {
+            sodium_memzero($key);
+        }
+
+        return false === $plaintext ? '' : $plaintext;
+    }
+
+    /**
+     * Resolve the effective Bono API base URL for the connect flow.
+     *
+     * Priority: wp-config constant BONO_API_BASE_URL > saved setting >
+     * the plugin's BONO_DEFAULT_API_BASE_URL build-time default.
+     *
+     * @return string
+     */
+    public static function get_effective_api_base_url() {
+        if (defined('BONO_API_BASE_URL') && '' !== (string) BONO_API_BASE_URL) {
+            return esc_url_raw(trim((string) BONO_API_BASE_URL));
+        }
+
+        $settings = self::get_settings();
+
+        if (!empty($settings['api_base_url'])) {
+            return esc_url_raw(trim((string) $settings['api_base_url']));
+        }
+
+        if (defined('BONO_DEFAULT_API_BASE_URL') && '' !== (string) BONO_DEFAULT_API_BASE_URL) {
+            return esc_url_raw(trim((string) BONO_DEFAULT_API_BASE_URL));
+        }
+
+        return '';
     }
 
     /**
@@ -198,10 +333,13 @@ class Bono_Settings {
                 : '';
         }
 
+        // $existing['api_key'] is already decrypted by get_settings(); an empty
+        // submission preserves the current key. Encrypt at rest before storage.
+        $resolved_api_key = '' !== $api_key ? $api_key : (isset($existing['api_key']) ? $existing['api_key'] : '');
+
         return array(
             'api_base_url' => $api_base_url,
-            // Stored as plain text for MVP. Keep this isolated for later encryption or secret storage hardening.
-            'api_key' => '' !== $api_key ? $api_key : (isset($existing['api_key']) ? $existing['api_key'] : ''),
+            'api_key' => self::encrypt_secret($resolved_api_key),
             'site_id' => $site_id,
             'enable_debug_log' => !empty($input['enable_debug_log']),
         );
@@ -302,6 +440,82 @@ class Bono_Settings {
         if (file_exists($settings_page)) {
             require $settings_page;
         }
+    }
+
+    /**
+     * Handle the "Connect to Bono" admin action: exchange a provisioning token
+     * for a site_id + API key and persist them (API key encrypted at rest).
+     *
+     * @return void
+     */
+    public function handle_connect_site() {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to connect this site.', 'bono-leads-connector'));
+        }
+
+        check_admin_referer('bono_connect_site');
+
+        if (!class_exists('Bono_API_Client')) {
+            $this->redirect_after_connect(false, __('Bono API client is unavailable.', 'bono-leads-connector'));
+        }
+
+        $token = isset($_POST['bono_provisioning_token'])
+            ? sanitize_text_field(wp_unslash($_POST['bono_provisioning_token']))
+            : '';
+
+        if ('' === $token) {
+            $this->redirect_after_connect(false, __('Please paste a provisioning token from Bono.', 'bono-leads-connector'));
+        }
+
+        $api_base_url = self::get_effective_api_base_url();
+
+        if ('' === $api_base_url) {
+            $this->redirect_after_connect(false, __('Set the API Base URL before connecting.', 'bono-leads-connector'));
+        }
+
+        $client = new Bono_API_Client();
+        $result = $client->register_site($token, $api_base_url);
+
+        if (empty($result['success'])) {
+            $message = !empty($result['error'])
+                ? sprintf(
+                    /* translators: %s: error message from Bono. */
+                    __('Connection failed: %s', 'bono-leads-connector'),
+                    sanitize_text_field($result['error'])
+                )
+                : __('Connection failed.', 'bono-leads-connector');
+            $this->redirect_after_connect(false, $message);
+        }
+
+        // Persist the issued credentials. The API key is encrypted at rest.
+        $settings = self::get_settings();
+        $settings['api_base_url'] = $api_base_url;
+        $settings['site_id'] = sanitize_text_field((string) $result['site_id']);
+        $settings['api_key'] = self::encrypt_secret((string) $result['api_key']);
+        update_option(self::OPTION_KEY, $settings);
+
+        $this->redirect_after_connect(true, __('Connected to Bono successfully. Leads from this site will now be delivered.', 'bono-leads-connector'));
+    }
+
+    /**
+     * Redirect back to the settings page with a connect result notice.
+     *
+     * @param bool   $success Whether the connection succeeded.
+     * @param string $message Notice message.
+     * @return void
+     */
+    private function redirect_after_connect($success, $message) {
+        $redirect_url = add_query_arg(
+            array(
+                'page' => 'bono-leads-connector',
+                'bono_connect_status' => $success ? 'success' : 'error',
+                'bono_connect_message' => (string) $message,
+            ),
+            admin_url('options-general.php')
+        );
+
+        wp_safe_redirect($redirect_url);
+        exit;
     }
 
     /**
