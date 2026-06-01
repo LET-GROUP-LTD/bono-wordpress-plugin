@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <ruleset name="Bono Leads Connector">
     <description>
-        Security and correctness standards for the Bono Leads Connector plugin.
-        Pure-formatting sniffs (indentation, spacing, alignment) are intentionally
-        excluded — they are deferred to a dedicated formatting pass (P2 cleanup) so
-        this gate stays focused on real bugs: output escaping, nonce verification,
-        input sanitization, SQL preparation, i18n, and PHP version compatibility.
+        WordPress coding standards for the Bono Leads Connector plugin: the full
+        WordPress-Extra ruleset (formatting + best practices + security) plus PHP
+        version compatibility. Two sniffs are excluded with documented rationale
+        because they are architecturally inapplicable here and produce only false
+        positives. The gate blocks on errors; warnings are informational.
     </description>
 
     <file>bono-leads-connector.php</file>
@@ -25,14 +25,14 @@
     <config name="minimum_wp_version" value="6.0"/>
 
     <!--
-        Block CI on ERRORS only. Warnings (e.g. missing i18n translator comments)
-        stay visible in the report but do not fail the gate; they are tracked for
-        the dedicated P2 i18n / formatting pass.
+        Block CI on ERRORS only. Warnings (e.g. error_log diagnostics gated behind
+        a debug flag, recommended-nonce notices on read-only $_GET display) stay
+        visible in the report but do not fail the gate.
     -->
     <config name="ignore_warnings_on_exit" value="1"/>
 
-    <!-- High-value correctness / security sniffs only. -->
-    <rule ref="WordPress.Security">
+    <!-- Full WordPress coding standard (formatting, docs, best practices, security). -->
+    <rule ref="WordPress-Extra">
         <!--
             This plugin passively captures submissions from third-party form
             plugins (CF7, Elementor, Gravity, …) via their own hooks. There is no
@@ -42,8 +42,6 @@
             positives here.
         -->
         <exclude name="WordPress.Security.NonceVerification"/>
-    </rule>
-    <rule ref="WordPress.DB.PreparedSQL">
         <!--
             The only interpolated value in the queue queries is $this->table_name
             (a $wpdb->prefix-derived constant, never user input). All user-supplied
@@ -52,9 +50,7 @@
         -->
         <exclude name="WordPress.DB.PreparedSQL.InterpolatedNotPrepared"/>
     </rule>
-    <rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
-    <rule ref="WordPress.PHP.NoSilencedErrors"/>
-    <rule ref="WordPress.WP.EnqueuedResources"/>
+
     <rule ref="PHPCompatibilityWP"/>
 
     <rule ref="WordPress.WP.I18n">
