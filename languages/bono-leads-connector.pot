@@ -1,0 +1,495 @@
+# Copyright (C) 2026 Bono
+# This file is distributed under the same license as the Bono Leads Connector plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Bono Leads Connector 0.6.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/bono-wordpress-plugin\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-06-01T14:43:08+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.11.0\n"
+"X-Domain: bono-leads-connector\n"
+
+#. Plugin Name of the plugin
+#: bono-leads-connector.php
+#: admin/settings-page.php:14
+#: includes/class-bono-settings.php:240
+msgid "Bono Leads Connector"
+msgstr ""
+
+#. Description of the plugin
+#: bono-leads-connector.php
+msgid "Captures WordPress form submissions and sends them to Bono."
+msgstr ""
+
+#. Author of the plugin
+#: bono-leads-connector.php
+msgid "Bono"
+msgstr ""
+
+#: admin/settings-page.php:15
+msgid "Connect this WordPress site to Bono and send form submissions as lead sources."
+msgstr ""
+
+#. translators: %s: HTTP status code.
+#: admin/settings-page.php:31
+msgid "HTTP status: %s"
+msgstr ""
+
+#: admin/settings-page.php:74
+msgid "Connect to Bono"
+msgstr ""
+
+#. translators: %s: Bono site ID.
+#: admin/settings-page.php:81
+msgid "This site is connected to Bono (Site ID: %s). Reconnect with a new token to rotate credentials."
+msgstr ""
+
+#: admin/settings-page.php:87
+msgid "Generate a connection token in your Bono workspace settings, then paste it here to connect this site automatically."
+msgstr ""
+
+#: admin/settings-page.php:97
+msgid "Paste your Bono connection token"
+msgstr ""
+
+#: admin/settings-page.php:100
+msgid "Reconnect"
+msgstr ""
+
+#: admin/settings-page.php:100
+msgid "Connect"
+msgstr ""
+
+#: admin/settings-page.php:105
+msgid "Manual configuration"
+msgstr ""
+
+#: admin/settings-page.php:106
+msgid "Advanced: configure the API connection manually instead of using a connection token."
+msgstr ""
+
+#: admin/settings-page.php:120
+msgid "Test API Connection"
+msgstr ""
+
+#: admin/settings-page.php:125
+msgid "Field Mapping"
+msgstr ""
+
+#: admin/settings-page.php:126
+msgid "Bono auto-detects which field is the name, email, and phone. If a form is detected incorrectly, map its fields here. Forms appear automatically after their first submission."
+msgstr ""
+
+#: admin/settings-page.php:131
+msgid "Name"
+msgstr ""
+
+#: admin/settings-page.php:132
+msgid "Email"
+msgstr ""
+
+#: admin/settings-page.php:133
+msgid "Phone"
+msgstr ""
+
+#: admin/settings-page.php:137
+msgid "No forms captured yet. Submit a form on this site once, then return here to map its fields."
+msgstr ""
+
+#: admin/settings-page.php:145
+msgid "Form"
+msgstr ""
+
+#: admin/settings-page.php:168
+msgid "Auto-detect"
+msgstr ""
+
+#: admin/settings-page.php:181
+msgid "Save Field Mappings"
+msgstr ""
+
+#: admin/settings-page.php:187
+msgid "Submission Queue"
+msgstr ""
+
+#: admin/settings-page.php:188
+msgid "Failed submissions are stored and retried automatically in the background (Action Scheduler, with a WP-Cron fallback)."
+msgstr ""
+
+#: admin/settings-page.php:192
+#: includes/class-bono-settings.php:783
+#: includes/class-bono-submission-queue.php:659
+msgid "Healthy"
+msgstr ""
+
+#. translators: %s: queue health state label (e.g. Healthy).
+#: admin/settings-page.php:198
+msgid "Queue health: %s"
+msgstr ""
+
+#. translators: %d: number of pending submissions.
+#: admin/settings-page.php:205
+msgid "Pending: %d"
+msgstr ""
+
+#. translators: %d: number of submissions being retried.
+#: admin/settings-page.php:206
+msgid "Retrying: %d"
+msgstr ""
+
+#. translators: %d: number of successfully sent submissions.
+#: admin/settings-page.php:207
+msgid "Sent: %d"
+msgstr ""
+
+#. translators: %d: number of failed submissions.
+#: admin/settings-page.php:208
+msgid "Failed: %d"
+msgstr ""
+
+#. translators: %s: human-readable age.
+#: admin/settings-page.php:215
+msgid "Oldest pending age: %s"
+msgstr ""
+
+#. translators: %s: datetime in site timezone.
+#: admin/settings-page.php:228
+msgid "Latest failed update: %s"
+msgstr ""
+
+#: admin/settings-page.php:235
+msgid "Latest Failed Errors"
+msgstr ""
+
+#: admin/settings-page.php:236
+msgid "Only safe queue metadata is shown. Payload, contact values, raw fields, and API keys are never displayed here."
+msgstr ""
+
+#: admin/settings-page.php:241
+msgid "Created"
+msgstr ""
+
+#: admin/settings-page.php:242
+msgid "Updated"
+msgstr ""
+
+#: admin/settings-page.php:243
+msgid "Provider"
+msgstr ""
+
+#: admin/settings-page.php:244
+msgid "Source Key"
+msgstr ""
+
+#: admin/settings-page.php:245
+msgid "Attempts"
+msgstr ""
+
+#: admin/settings-page.php:246
+msgid "Last Error"
+msgstr ""
+
+#: admin/settings-page.php:263
+msgid "No failed queue rows."
+msgstr ""
+
+#: admin/settings-page.php:269
+msgid "Retry Failed Submissions"
+msgstr ""
+
+#: admin/settings-page.php:275
+msgid "Process Queue Now"
+msgstr ""
+
+#: admin/settings-page.php:281
+msgid "Delete Sent Queue Rows"
+msgstr ""
+
+#: admin/settings-page.php:287
+msgid "Delete Failed Queue Rows (Destructive)"
+msgstr ""
+
+#: admin/settings-page.php:287
+msgid "Delete all failed queue rows? This cannot be undone."
+msgstr ""
+
+#: includes/class-bono-api-client.php:23
+#: includes/class-bono-api-client.php:48
+msgid "Missing Bono API settings."
+msgstr ""
+
+#: includes/class-bono-api-client.php:27
+#: includes/class-bono-api-client.php:52
+msgid "Insecure API Base URL is not allowed."
+msgstr ""
+
+#: includes/class-bono-api-client.php:33
+#: includes/class-bono-api-client.php:58
+#: includes/class-bono-api-client.php:97
+msgid "Invalid Bono API base URL."
+msgstr ""
+
+#: includes/class-bono-api-client.php:87
+msgid "Provisioning token is required."
+msgstr ""
+
+#: includes/class-bono-api-client.php:91
+msgid "Insecure or invalid API Base URL is not allowed."
+msgstr ""
+
+#: includes/class-bono-api-client.php:139
+msgid "Bono rejected the connection request."
+msgstr ""
+
+#: includes/class-bono-api-client.php:294
+msgid "Sending Bono API request."
+msgstr ""
+
+#: includes/class-bono-api-client.php:332
+msgid "Bono API request failed."
+msgstr ""
+
+#: includes/class-bono-api-client.php:348
+msgid "Received Bono API response."
+msgstr ""
+
+#: includes/class-bono-api-client.php:361
+msgid "Bono API returned a non-success response."
+msgstr ""
+
+#: includes/class-bono-cf7-capture.php:60
+msgid "CF7 submission captured before mail send"
+msgstr ""
+
+#: includes/class-bono-elementor-capture.php:59
+msgid "Elementor submission captured"
+msgstr ""
+
+#: includes/class-bono-fluent-capture.php:50
+msgid "Fluent Forms submission captured"
+msgstr ""
+
+#: includes/class-bono-form-capture.php:314
+msgid "Submission skipped: missing required contact fields"
+msgstr ""
+
+#: includes/class-bono-form-capture.php:339
+msgid "Duplicate submission skipped"
+msgstr ""
+
+#: includes/class-bono-form-capture.php:353
+msgid "Submission skipped: source rate limit exceeded"
+msgstr ""
+
+#: includes/class-bono-form-capture.php:370
+#: includes/class-bono-form-capture.php:384
+msgid "Bono submission failed."
+msgstr ""
+
+#: includes/class-bono-forminator-capture.php:46
+msgid "Forminator submission captured"
+msgstr ""
+
+#: includes/class-bono-generic-capture.php:94
+msgid "Invalid or expired capture token."
+msgstr ""
+
+#: includes/class-bono-generic-capture.php:131
+msgid "Generic submission captured"
+msgstr ""
+
+#: includes/class-bono-gravity-capture.php:50
+msgid "Gravity Forms submission captured"
+msgstr ""
+
+#: includes/class-bono-settings.php:241
+msgid "Bono Leads"
+msgstr ""
+
+#: includes/class-bono-settings.php:266
+msgid "API Settings"
+msgstr ""
+
+#: includes/class-bono-settings.php:273
+msgid "API Base URL"
+msgstr ""
+
+#: includes/class-bono-settings.php:281
+msgid "API Key"
+msgstr ""
+
+#: includes/class-bono-settings.php:289
+msgid "Site ID"
+msgstr ""
+
+#: includes/class-bono-settings.php:297
+msgid "Debug Logging"
+msgstr ""
+
+#: includes/class-bono-settings.php:305
+msgid "Generic Form Capture"
+msgstr ""
+
+#: includes/class-bono-settings.php:336
+msgid "API Base URL must use https://, except http://localhost, http://127.0.0.1, or http://host.docker.internal for local development."
+msgstr ""
+
+#: includes/class-bono-settings.php:376
+msgid "https://api.example.com"
+msgstr ""
+
+#: includes/class-bono-settings.php:399
+msgid "Leave blank to keep the existing API key."
+msgstr ""
+
+#: includes/class-bono-settings.php:436
+msgid "Log failed Bono submission attempts to the PHP error log."
+msgstr ""
+
+#: includes/class-bono-settings.php:458
+msgid "Optional. CSS selectors (comma or newline separated) for custom/theme forms to capture in addition to the supported form plugins. Forms with a data-bono-capture attribute are always captured. Leave blank to disable generic capture."
+msgstr ""
+
+#: includes/class-bono-settings.php:490
+msgid "You do not have permission to connect this site."
+msgstr ""
+
+#: includes/class-bono-settings.php:496
+#: includes/class-bono-settings.php:606
+msgid "Bono API client is unavailable."
+msgstr ""
+
+#: includes/class-bono-settings.php:504
+msgid "Please paste a provisioning token from Bono."
+msgstr ""
+
+#: includes/class-bono-settings.php:510
+msgid "Set the API Base URL before connecting."
+msgstr ""
+
+#. translators: %s: error message from Bono.
+#: includes/class-bono-settings.php:520
+msgid "Connection failed: %s"
+msgstr ""
+
+#: includes/class-bono-settings.php:523
+msgid "Connection failed."
+msgstr ""
+
+#: includes/class-bono-settings.php:534
+msgid "Connected to Bono successfully. Leads from this site will now be delivered."
+msgstr ""
+
+#: includes/class-bono-settings.php:565
+msgid "You do not have permission to save field mappings."
+msgstr ""
+
+#: includes/class-bono-settings.php:584
+msgid "Field mappings saved."
+msgstr ""
+
+#: includes/class-bono-settings.php:600
+msgid "You do not have permission to test this connection."
+msgstr ""
+
+#: includes/class-bono-settings.php:613
+msgid "Bono API connection succeeded."
+msgstr ""
+
+#: includes/class-bono-settings.php:626
+msgid "You do not have permission to retry failed submissions."
+msgstr ""
+
+#: includes/class-bono-settings.php:632
+#: includes/class-bono-settings.php:659
+#: includes/class-bono-settings.php:686
+#: includes/class-bono-settings.php:713
+msgid "Bono queue service is unavailable."
+msgstr ""
+
+#. translators: %d: number of submissions moved to retrying.
+#: includes/class-bono-settings.php:639
+msgid "Marked %d failed submissions for retry."
+msgstr ""
+
+#: includes/class-bono-settings.php:653
+msgid "You do not have permission to process the queue."
+msgstr ""
+
+#. translators: %d: number of queued rows processed.
+#: includes/class-bono-settings.php:666
+msgid "Processed %d queued submissions."
+msgstr ""
+
+#: includes/class-bono-settings.php:680
+msgid "You do not have permission to delete sent queue rows."
+msgstr ""
+
+#. translators: %d: deleted row count.
+#: includes/class-bono-settings.php:693
+msgid "Deleted %d sent queue rows."
+msgstr ""
+
+#: includes/class-bono-settings.php:707
+msgid "You do not have permission to delete failed queue rows."
+msgstr ""
+
+#. translators: %d: deleted row count.
+#: includes/class-bono-settings.php:720
+msgid "Deleted %d failed queue rows."
+msgstr ""
+
+#. translators: %s: API error message.
+#: includes/class-bono-settings.php:737
+msgid "Bono API connection failed: %s"
+msgstr ""
+
+#: includes/class-bono-settings.php:742
+msgid "Bono API connection failed."
+msgstr ""
+
+#: includes/class-bono-settings.php:784
+#: includes/class-bono-submission-queue.php:660
+msgid "No failed submissions and pending queue is under 10."
+msgstr ""
+
+#: includes/class-bono-status-endpoint.php:81
+msgid "Invalid or missing Bono API key."
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:116
+msgid "Every 5 Minutes (Bono Queue)"
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:390
+msgid "Invalid queued payload."
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:404
+msgid "Queued submission failed."
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:520
+msgid "Critical"
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:521
+msgid "Failed queue count is high or pending submissions are older than 1 hour."
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:528
+msgid "Warning"
+msgstr ""
+
+#: includes/class-bono-submission-queue.php:529
+msgid "There are failed submissions or the pending queue is growing."
+msgstr ""
+
+#: includes/class-bono-wpforms-capture.php:55
+msgid "WPForms submission captured"
+msgstr ""
