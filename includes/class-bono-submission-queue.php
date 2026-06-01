@@ -73,7 +73,14 @@ class Bono_Submission_Queue {
     public function register_hooks() {
         // The processing callback is bound by hook name, so it works whether the
         // sweep is triggered by Action Scheduler or by the WP-Cron fallback.
-        add_action(self::CRON_HOOK, array($this, 'process_queue'));
+        // Wrapped in a void closure: process_queue() returns a processed count
+        // for direct callers, but a hook callback must not return a value.
+        add_action(
+            self::CRON_HOOK,
+            function () {
+                $this->process_queue();
+            }
+        );
 
         // Schedule the recurring sweep on init, the safe point after Action
         // Scheduler has initialized its data store. Guarded against duplicates.

@@ -1,0 +1,29 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - includes
+        - bono-leads-connector.php
+    # Declare the plugin's runtime-defined constants for isolated analysis.
+    bootstrapFiles:
+        - tests/phpstan-bootstrap.php
+    # Resolve symbols from the vendored runtime dependencies (Action Scheduler's
+    # as_* functions, plugin-update-checker classes) without analysing their code.
+    scanDirectories:
+        - vendor/woocommerce/action-scheduler
+        - vendor/yahnis-elsts/plugin-update-checker
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Contact Form 7 classes belong to an optional third-party plugin that is
+        # only present at runtime when the integration is active. Type hints and
+        # method calls against them cannot be resolved here.
+        - '#unknown class WPCF7_#'
+        - '#invalid type WPCF7_#'
+        # plugin-update-checker's getVcsApi() is typed to the abstract base Api;
+        # enableReleaseAssets() lives on the concrete GitHub VCS subclass that is
+        # actually returned for a github.com repository.
+        -
+            message: '#Call to an undefined method YahnisElsts\\PluginUpdateChecker\\v5p7\\Vcs\\Api::enableReleaseAssets\(\)#'
+            path: bono-leads-connector.php
