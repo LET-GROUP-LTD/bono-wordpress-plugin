@@ -44,6 +44,7 @@ class Bono_Settings {
             'api_key' => '',
             'site_id' => '',
             'enable_debug_log' => false,
+            'generic_capture_selectors' => '',
         );
     }
 
@@ -297,6 +298,14 @@ class Bono_Settings {
             'bono-leads-connector',
             'bono_leads_connector_api'
         );
+
+        add_settings_field(
+            'generic_capture_selectors',
+            __('Generic Form Capture', 'bono-leads-connector'),
+            array($this, 'render_generic_capture_selectors_field'),
+            'bono-leads-connector',
+            'bono_leads_connector_api'
+        );
     }
 
     /**
@@ -337,11 +346,16 @@ class Bono_Settings {
         // submission preserves the current key. Encrypt at rest before storage.
         $resolved_api_key = '' !== $api_key ? $api_key : (isset($existing['api_key']) ? $existing['api_key'] : '');
 
+        $generic_capture_selectors = isset($input['generic_capture_selectors']) && is_scalar($input['generic_capture_selectors'])
+            ? sanitize_textarea_field((string) $input['generic_capture_selectors'])
+            : '';
+
         return array(
             'api_base_url' => $api_base_url,
             'api_key' => self::encrypt_secret($resolved_api_key),
             'site_id' => $site_id,
             'enable_debug_log' => !empty($input['enable_debug_log']),
+            'generic_capture_selectors' => $generic_capture_selectors,
         );
     }
 
@@ -420,6 +434,28 @@ class Bono_Settings {
             />
             <?php esc_html_e('Log failed Bono submission attempts to the PHP error log.', 'bono-leads-connector'); ?>
         </label>
+        <?php
+    }
+
+    /**
+     * Render the generic capture selectors field.
+     *
+     * @return void
+     */
+    public function render_generic_capture_selectors_field() {
+        $settings = self::get_settings();
+        $value = isset($settings['generic_capture_selectors']) ? (string) $settings['generic_capture_selectors'] : '';
+        ?>
+        <textarea
+            class="large-text code"
+            rows="3"
+            dir="ltr"
+            name="<?php echo esc_attr(self::OPTION_KEY); ?>[generic_capture_selectors]"
+            placeholder="#contact-form, .lead-form"
+        ><?php echo esc_textarea($value); ?></textarea>
+        <p class="description">
+            <?php esc_html_e('Optional. CSS selectors (comma or newline separated) for custom/theme forms to capture in addition to the supported form plugins. Forms with a data-bono-capture attribute are always captured. Leave blank to disable generic capture.', 'bono-leads-connector'); ?>
+        </p>
         <?php
     }
 

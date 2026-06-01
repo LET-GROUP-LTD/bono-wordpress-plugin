@@ -1,10 +1,10 @@
 === Bono Leads Connector ===
 Contributors: bono
-Tags: leads, forms, contact form 7, elementor
+Tags: leads, forms, contact form 7, elementor, gravity forms, fluent forms, forminator
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,7 +14,7 @@ Captures supported WordPress form submissions and sends normalized lead source p
 
 Bono Leads Connector is a standalone WordPress plugin for sending supported WordPress form submissions to the Bono API.
 
-The MVP supports Contact Form 7, Elementor Pro Forms, and WPForms when those plugins are installed. Missing integrations are skipped safely.
+Supports Contact Form 7, Elementor Pro Forms, WPForms, Gravity Forms, Fluent Forms, and Forminator when those plugins are installed (missing integrations are skipped safely), plus an opt-in generic capture for custom/theme forms.
 
 == Installation ==
 
@@ -30,6 +30,14 @@ into `vendor/`. When `vendor/` is absent the submission queue degrades
 gracefully to WP-Cron.
 
 == Changelog ==
+
+= 0.3.0 =
+* Added capture integrations for Gravity Forms, Fluent Forms, and Forminator
+  (auto-detected; skipped when the plugin is not installed).
+* Added opt-in generic capture for custom/theme forms: choose forms by CSS
+  selector in settings or a data-bono-capture attribute. A non-blocking frontend
+  script forwards submissions to a plugin REST endpoint (the API key stays
+  server-side); the same validation, dedup, rate-limit, and queue apply.
 
 = 0.2.0 =
 * Added one-click "Connect to Bono": paste a provisioning token from your Bono

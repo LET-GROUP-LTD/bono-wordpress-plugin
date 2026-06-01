@@ -121,6 +121,10 @@ class Bono_Plugin {
             'includes/class-bono-cf7-capture.php',
             'includes/class-bono-elementor-capture.php',
             'includes/class-bono-wpforms-capture.php',
+            'includes/class-bono-gravity-capture.php',
+            'includes/class-bono-fluent-capture.php',
+            'includes/class-bono-forminator-capture.php',
+            'includes/class-bono-generic-capture.php',
         );
 
         foreach ($integration_files as $file) {
@@ -177,6 +181,26 @@ class Bono_Plugin {
         if (class_exists('Bono_WPForms_Capture')) {
             $wpforms_capture = new Bono_WPForms_Capture($this->api_client, $this->submission_queue);
             $wpforms_capture->register_hooks();
+        }
+
+        if (class_exists('Bono_Gravity_Capture')) {
+            $gravity_capture = new Bono_Gravity_Capture($this->api_client, $this->submission_queue);
+            $gravity_capture->register_hooks();
+        }
+
+        if (class_exists('Bono_Fluent_Capture')) {
+            $fluent_capture = new Bono_Fluent_Capture($this->api_client, $this->submission_queue);
+            $fluent_capture->register_hooks();
+        }
+
+        if (class_exists('Bono_Forminator_Capture')) {
+            $forminator_capture = new Bono_Forminator_Capture($this->api_client, $this->submission_queue);
+            $forminator_capture->register_hooks();
+        }
+
+        if (class_exists('Bono_Generic_Capture')) {
+            $generic_capture = new Bono_Generic_Capture($this->api_client, $this->submission_queue);
+            $generic_capture->register_hooks();
         }
     }
 }
