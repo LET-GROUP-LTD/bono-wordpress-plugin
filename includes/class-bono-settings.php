@@ -567,8 +567,10 @@ class Bono_Settings {
 
         check_admin_referer('bono_save_field_mappings');
 
+        // Nonce verified above; every key and value is sanitized inside
+        // Bono_Field_Mapping::save_mappings(), which PHPCS cannot follow.
         $raw = isset($_POST['bono_field_mappings']) && is_array($_POST['bono_field_mappings'])
-            ? wp_unslash($_POST['bono_field_mappings'])
+            ? wp_unslash($_POST['bono_field_mappings']) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in save_mappings()
             : array();
 
         if (class_exists('Bono_Field_Mapping')) {
