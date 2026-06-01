@@ -5,7 +5,8 @@
     "license": "proprietary",
     "require": {
         "php": ">=7.4",
-        "woocommerce/action-scheduler": "^3.8"
+        "woocommerce/action-scheduler": "^3.8",
+        "yahnis-elsts/plugin-update-checker": "^5.4"
     },
     "config": {
         "optimize-autoloader": true,
