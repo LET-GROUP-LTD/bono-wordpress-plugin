@@ -71,11 +71,18 @@ jobs:
         # exactly as the release build does.
         run: composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
 
-      - name: Assert bundled runtime dependencies are present
+      - name: Assert every declared dependency is vendored
+        # Derived from composer.json so it stays correct as dependencies change
+        # (e.g. plugin-update-checker arrives with the self-update feature).
         run: |
           set -euo pipefail
-          test -f vendor/woocommerce/action-scheduler/action-scheduler.php
-          test -f vendor/yahnis-elsts/plugin-update-checker/plugin-update-checker.php
+          for pkg in $(jq -r '.require | keys[] | select(. != "php")' composer.json); do
+            if [ ! -d "vendor/$pkg" ]; then
+              echo "::error::Declared dependency '$pkg' is missing from vendor/ after install."
+              exit 1
+            fi
+            echo "ok: vendor/$pkg"
+          done
 
   lint-js:
     name: Lint JS
