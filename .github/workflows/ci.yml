@@ -101,3 +101,49 @@ jobs:
           set -euo pipefail
           find ./assets -name '*.js' -print0 \
             | xargs -0 -r -n1 node --check
+
+  phpunit:
+    name: PHPUnit (${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Lower and upper bound of the supported PHP range.
+        php: ['7.4', '8.3']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer
+          coverage: none
+
+      - name: Install dependencies (incl. dev)
+        run: composer install --optimize-autoloader --prefer-dist --no-interaction
+
+      - name: Run unit tests
+        run: composer test
+
+  phpcs:
+    name: PHPCS (security)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+
+      - name: Install dependencies (incl. dev)
+        run: composer install --optimize-autoloader --prefer-dist --no-interaction
+
+      - name: Run PHP_CodeSniffer (security/correctness ruleset)
+        # Blocks on errors only; warnings are informational (see phpcs.xml.dist).
+        run: composer phpcs

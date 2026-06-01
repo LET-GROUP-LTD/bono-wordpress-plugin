@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<ruleset name="Bono Leads Connector">
+    <description>
+        Security and correctness standards for the Bono Leads Connector plugin.
+        Pure-formatting sniffs (indentation, spacing, alignment) are intentionally
+        excluded — they are deferred to a dedicated formatting pass (P2 cleanup) so
+        this gate stays focused on real bugs: output escaping, nonce verification,
+        input sanitization, SQL preparation, i18n, and PHP version compatibility.
+    </description>
+
+    <file>bono-leads-connector.php</file>
+    <file>includes</file>
+    <file>admin</file>
+
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+
+    <arg name="extensions" value="php"/>
+    <arg name="basepath" value="."/>
+    <arg value="ps"/>
+    <arg name="colors"/>
+
+    <config name="testVersion" value="7.4-"/>
+    <config name="minimum_wp_version" value="6.0"/>
+
+    <!--
+        Block CI on ERRORS only. Warnings (e.g. missing i18n translator comments)
+        stay visible in the report but do not fail the gate; they are tracked for
+        the dedicated P2 i18n / formatting pass.
+    -->
+    <config name="ignore_warnings_on_exit" value="1"/>
+
+    <!-- High-value correctness / security sniffs only. -->
+    <rule ref="WordPress.Security">
+        <!--
+            This plugin passively captures submissions from third-party form
+            plugins (CF7, Elementor, Gravity, …) via their own hooks. There is no
+            nonce of ours to verify on those payloads, and all captured values are
+            sanitized before use. Admin-side state changes DO verify nonces via
+            check_admin_referer(). This sniff therefore produces only false
+            positives here.
+        -->
+        <exclude name="WordPress.Security.NonceVerification"/>
+    </rule>
+    <rule ref="WordPress.DB.PreparedSQL">
+        <!--
+            The only interpolated value in the queue queries is $this->table_name
+            (a $wpdb->prefix-derived constant, never user input). All user-supplied
+            values already pass through $wpdb->prepare() placeholders. Table names
+            cannot be bound as placeholders, so this flag is a false positive.
+        -->
+        <exclude name="WordPress.DB.PreparedSQL.InterpolatedNotPrepared"/>
+    </rule>
+    <rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
+    <rule ref="WordPress.PHP.NoSilencedErrors"/>
+    <rule ref="WordPress.WP.EnqueuedResources"/>
+    <rule ref="PHPCompatibilityWP"/>
+
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="bono-leads-connector"/>
+            </property>
+        </properties>
+    </rule>
+</ruleset>
