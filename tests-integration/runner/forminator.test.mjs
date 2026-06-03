@@ -16,9 +16,6 @@ test('Forminator happy path', async () => {
 });
 
 test('Forminator missing contact (name only) → skipped, zero requests', async () => {
-  // Brief wait to let the fire-and-forget option delete from the previous test
-  // finish before we set the option for this test, avoiding a race condition.
-  await new Promise((r) => setTimeout(r, 500));
   await wpEval('forminator.php', { NAME: 'Only Name', OMIT_CONTACT: '1' });
   await new Promise((r) => setTimeout(r, 1500));
   assert.equal((await getRequests()).length, 0);

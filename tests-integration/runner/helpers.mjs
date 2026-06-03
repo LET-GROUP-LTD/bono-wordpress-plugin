@@ -50,8 +50,6 @@ export async function wpEval(triggerFile, env = {}) {
   const args = ['run', 'cli', '--env-cwd=' + PLUGIN_DIR, 'wp', 'eval-file',
     `tests-integration/triggers/${triggerFile}`];
   const { stdout } = await exec(WP_ENV_BIN, args, { env: { ...process.env } });
-  // Clean up — fire-and-forget; don't await to avoid slowing tests.
-  exec(WP_ENV_BIN, ['run', 'cli', 'wp', 'option', 'delete', 'bono_test_trigger_env']).catch(() => {});
   return stdout;
 }
 

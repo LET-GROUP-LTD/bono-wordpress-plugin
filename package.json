@@ -8,7 +8,7 @@
     "env:clean": "wp-env clean all",
     "mock": "node tests-integration/mock-backend/server.mjs",
     "test:mock": "node --test tests-integration/mock-backend/",
-    "test:integration": "node --test tests-integration/runner/",
+    "test:integration": "node --test --test-concurrency=1 tests-integration/runner/",
     "provision": "node tests-integration/provision/wait-for-wp.mjs && wp-env run cli wp eval-file wp-content/plugins/bono-leads-connector/tests-integration/provision/seed-forms.php && wp-env run cli wp eval-file wp-content/plugins/bono-leads-connector/tests-integration/provision/configure-plugin.php"
   },
   "devDependencies": {
