@@ -33,12 +33,25 @@ export async function getRequests() {
   return res.json();
 }
 
-/** Run a PHP trigger inside wp-env, passing test inputs via env vars. */
+/**
+ * Run a PHP trigger inside wp-env, passing test inputs via a WP option.
+ *
+ * wp-env runs inside Docker so host-process env vars are not visible to PHP
+ * getenv(). Instead we write the inputs to the `bono_test_trigger_env` WP
+ * option before executing the trigger, and the trigger reads from that option.
+ * The option is deleted after the trigger runs to keep state clean.
+ */
 export async function wpEval(triggerFile, env = {}) {
+  const envJson = JSON.stringify(env);
+  // Store env data in WP option so the PHP trigger can read it.
+  await exec(WP_ENV_BIN, [
+    'run', 'cli', 'wp', 'option', 'update', 'bono_test_trigger_env', envJson,
+  ]);
   const args = ['run', 'cli', '--env-cwd=' + PLUGIN_DIR, 'wp', 'eval-file',
     `tests-integration/triggers/${triggerFile}`];
-  const prefixed = Object.fromEntries(Object.entries(env).map(([k, v]) => [`BONO_TEST_${k}`, String(v)]));
-  const { stdout } = await exec(WP_ENV_BIN, args, { env: { ...process.env, ...prefixed } });
+  const { stdout } = await exec(WP_ENV_BIN, args, { env: { ...process.env } });
+  // Clean up — fire-and-forget; don't await to avoid slowing tests.
+  exec(WP_ENV_BIN, ['run', 'cli', 'wp', 'option', 'delete', 'bono_test_trigger_env']).catch(() => {});
   return stdout;
 }
 

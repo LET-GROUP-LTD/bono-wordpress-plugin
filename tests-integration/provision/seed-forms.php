@@ -25,5 +25,24 @@ if ( empty( $ids['cf7'] ) && class_exists( 'WPCF7_ContactForm' ) ) {
     $ids['cf7_page'] = (string) $page_id;
 }
 
+// --- WPForms ---
+if ( empty( $ids['wpforms'] ) && post_type_exists( 'wpforms' ) ) {
+    $wpf_id = wp_insert_post( array(
+        'post_title'  => 'Bono Test WPForms',
+        'post_status' => 'publish',
+        'post_type'   => 'wpforms',
+        'post_content' => wp_json_encode( array(
+            'id'     => 0,
+            'fields' => array(
+                '1' => array( 'id' => '1', 'type' => 'name',  'label' => 'Name' ),
+                '2' => array( 'id' => '2', 'type' => 'email', 'label' => 'Email' ),
+                '3' => array( 'id' => '3', 'type' => 'phone', 'label' => 'Phone' ),
+            ),
+            'settings' => array( 'form_title' => 'Bono Test WPForms' ),
+        ) ),
+    ) );
+    $ids['wpforms'] = (string) $wpf_id;
+}
+
 update_option( 'bono_test_form_ids', $ids );
 echo "seeded: " . wp_json_encode( $ids ) . "\n";
