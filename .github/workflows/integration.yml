@@ -1,0 +1,41 @@
+name: Integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Map host.docker.internal
+        run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+      - run: npm install
+      - name: Start mock backend
+        run: |
+          MOCK_PORT=3001 node tests-integration/mock-backend/server.mjs &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:3001/__control/requests && break; sleep 0.5; done
+      - name: Self-test the mock
+        run: npm run test:mock
+      - name: Start wp-env
+        run: npm run env:start
+      - name: Add host-gateway to wp-env container
+        run: |
+          CID=$(docker ps --filter "name=wordpress" --format '{{.ID}}' | head -n1)
+          docker exec "$CID" sh -c 'getent hosts host.docker.internal || echo "$(ip route | awk "/default/ {print \$3}") host.docker.internal" >> /etc/hosts' || true
+      - name: Provision
+        run: npm run provision
+      - name: Integration suite
+        run: npm run test:integration
+      - name: Tail WP debug log on failure
+        if: failure()
+        run: npx wp-env run cli wp eval 'echo @file_get_contents(WP_CONTENT_DIR."/debug.log");' || true
