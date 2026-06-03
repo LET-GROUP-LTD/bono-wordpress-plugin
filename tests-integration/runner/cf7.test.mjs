@@ -45,6 +45,23 @@ test('CF7 duplicate within idempotency window → second skipped', async () => {
   assert.equal(reqs.length, 1, 'duplicate suppressed');
 });
 
+test('CF7 payload has exactly the expected top-level keys (no leakage)', async () => {
+  await cf7Submit({ 'your-name': 'Shape Check', 'your-email': `shape-${RUN_ID}@example.com`, 'your-phone': '0500000000' });
+  const reqs = await waitForRequests(1);
+  const keys = Object.keys(reqs[0].body).sort();
+  // Lock on the real payload shape (13 keys). 'utm' and 'site' are intentional
+  // fields added by build_submission_payload — not leakage. This test guards
+  // against accidental addition of raw/unexpected keys in the future.
+  const expected = [
+    'contact', 'fields', 'formId', 'formName', 'idempotencyKey',
+    'pageId', 'pageUrl', 'provider', 'site', 'sourceKey',
+    'submittedAt', 'utm', 'validation',
+  ].sort();
+  assert.deepEqual(keys, expected);
+  // contact sub-shape
+  assert.deepEqual(Object.keys(reqs[0].body.contact).sort(), ['email', 'name', 'phone'].sort());
+});
+
 test('CF7 field-mapping override wins over auto-detection', async () => {
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');

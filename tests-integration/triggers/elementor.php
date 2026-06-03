@@ -52,7 +52,10 @@ $record = new Bono_Test_Elementor_Record( array(
 		'email' => array( 'id' => 'email', 'value' => $email, 'title' => 'Email' ),
 		'phone' => array( 'id' => 'phone', 'value' => $phone, 'title' => 'Phone' ),
 	),
-	'form_settings' => array( 'form_name' => 'Bono Test Elementor', 'id' => 'abc123' ),
+	// 'form_id' is the key Bono_Elementor_Capture::get_form_setting() looks up.
+	// Without it the handler falls back to form_name as the id, and sourceKey
+	// becomes 'elementor:Bono Test Elementor:…' instead of 'elementor:elem-test-7:…'.
+	'form_settings' => array( 'form_name' => 'Bono Test Elementor', 'form_id' => 'elem-test-7', 'id' => 'abc123' ),
 	'page_id'       => 12,
 	'post_id'       => 12,
 	'meta'          => array(),
