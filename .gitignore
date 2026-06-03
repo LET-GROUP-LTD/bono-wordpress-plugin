@@ -8,3 +8,7 @@ build/
 .idea/
 .vscode/
 .phpunit.result.cache
+
+# Integration test harness
+/node_modules/
+/.wp-env-home/
