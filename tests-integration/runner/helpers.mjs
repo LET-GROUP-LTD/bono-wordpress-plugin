@@ -39,7 +39,9 @@ export async function getRequests() {
  * wp-env runs inside Docker so host-process env vars are not visible to PHP
  * getenv(). Instead we write the inputs to the `bono_test_trigger_env` WP
  * option before executing the trigger, and the trigger reads from that option.
- * The option is deleted after the trigger runs to keep state clean.
+ * Each call fully overwrites the option, so no post-run cleanup is needed
+ * (a previous fire-and-forget delete was removed because it could race with the
+ * next test's write).
  */
 export async function wpEval(triggerFile, env = {}) {
   const envJson = JSON.stringify(env);
