@@ -43,7 +43,7 @@ if ( file_exists( $bono_action_scheduler ) ) {
 $bono_update_checker_lib = BONO_PLUGIN_PATH . 'vendor/yahnis-elsts/plugin-update-checker/plugin-update-checker.php';
 
 if ( ! defined( 'BONO_UPDATE_REPO_URL' ) ) {
-	define( 'BONO_UPDATE_REPO_URL', 'https://github.com/LET-GROUP-LTD/bono-wordpress-plugin-dist/' );
+	define( 'BONO_UPDATE_REPO_URL', 'https://github.com/LET-GROUP-LTD/bono-wordpress-plugin/' );
 }
 
 if (

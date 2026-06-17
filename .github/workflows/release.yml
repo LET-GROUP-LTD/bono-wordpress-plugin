@@ -1,17 +1,14 @@
 name: Release
 
-# Builds a distributable plugin ZIP and publishes it as a GitHub Release on the
-# PUBLIC distribution repo (bono-wordpress-plugin-dist). Client sites read that
-# repo's Releases tokenless via plugin-update-checker. The source stays private.
+# Builds a distributable plugin ZIP and publishes it as a GitHub Release on THIS
+# (public) repo. Client sites read this repo's Releases tokenless via
+# plugin-update-checker, so no separate distribution repo or PAT is needed —
+# the built-in GITHUB_TOKEN publishes the release to the current repository.
 #
-# Trigger: push a tag like v0.4.0. The tag (minus the leading "v") must match both
+# Trigger: push a tag like v0.6.0. The tag (minus the leading "v") must match both
 # the plugin header "Version:" and the BONO_PLUGIN_VERSION constant, or the build
 # fails fast — this prevents shipping a ZIP whose internal version disagrees with
 # the release, which would make WordPress see an endless "update available".
-#
-# Requires repo secret DIST_REPO_TOKEN: a PAT (fine-grained, Contents: read+write
-# on bono-wordpress-plugin-dist only). The default GITHUB_TOKEN cannot write to
-# another repository.
 
 on:
   push:
@@ -19,14 +16,13 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     env:
       PLUGIN_SLUG: bono-leads-connector
-      DIST_REPO: LET-GROUP-LTD/bono-wordpress-plugin-dist
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -82,11 +78,9 @@ jobs:
           ( cd build && zip -rq "${PLUGIN_SLUG}.zip" "${PLUGIN_SLUG}" )
           ls -lh "build/${PLUGIN_SLUG}.zip"
 
-      - name: Publish release to distribution repo
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          repository: ${{ env.DIST_REPO }}
-          token: ${{ secrets.DIST_REPO_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: build/${{ env.PLUGIN_SLUG }}.zip
