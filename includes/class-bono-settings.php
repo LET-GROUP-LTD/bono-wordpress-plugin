@@ -117,15 +117,22 @@ class Bono_Settings {
 			return $plaintext;
 		}
 
-		$key    = self::get_encryption_key();
-		$nonce  = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$cipher = sodium_crypto_secretbox( $plaintext, $nonce, $key );
+		// Encryption is best-effort: on some hosts libsodium / hash_hkdf can throw
+		// at runtime (PHP build quirks). Connecting must never fatal over this, so
+		// fall back to plaintext storage (the documented MVP behavior).
+		try {
+			$key    = self::get_encryption_key();
+			$nonce  = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+			$cipher = sodium_crypto_secretbox( $plaintext, $nonce, $key );
 
-		if ( function_exists( 'sodium_memzero' ) ) {
-			sodium_memzero( $key );
+			if ( function_exists( 'sodium_memzero' ) ) {
+				sodium_memzero( $key );
+			}
+
+			return self::SECRET_PREFIX . base64_encode( $nonce . $cipher );
+		} catch ( \Throwable $e ) {
+			return $plaintext;
 		}
-
-		return self::SECRET_PREFIX . base64_encode( $nonce . $cipher );
 	}
 
 	/**
@@ -149,22 +156,26 @@ class Bono_Settings {
 			return '';
 		}
 
-		$raw = base64_decode( substr( $stored, strlen( self::SECRET_PREFIX ) ), true );
+		try {
+			$raw = base64_decode( substr( $stored, strlen( self::SECRET_PREFIX ) ), true );
 
-		if ( false === $raw || strlen( $raw ) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES ) {
+			if ( false === $raw || strlen( $raw ) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES ) {
+				return '';
+			}
+
+			$nonce     = substr( $raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+			$cipher    = substr( $raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+			$key       = self::get_encryption_key();
+			$plaintext = sodium_crypto_secretbox_open( $cipher, $nonce, $key );
+
+			if ( function_exists( 'sodium_memzero' ) ) {
+				sodium_memzero( $key );
+			}
+
+			return false === $plaintext ? '' : $plaintext;
+		} catch ( \Throwable $e ) {
 			return '';
 		}
-
-		$nonce     = substr( $raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$cipher    = substr( $raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$key       = self::get_encryption_key();
-		$plaintext = sodium_crypto_secretbox_open( $cipher, $nonce, $key );
-
-		if ( function_exists( 'sodium_memzero' ) ) {
-			sodium_memzero( $key );
-		}
-
-		return false === $plaintext ? '' : $plaintext;
 	}
 
 	/**
@@ -525,11 +536,17 @@ class Bono_Settings {
 		}
 
 		// Persist the issued credentials. The API key is encrypted at rest.
-		$settings                 = self::get_settings();
-		$settings['api_base_url'] = $api_base_url;
-		$settings['site_id']      = sanitize_text_field( (string) $result['site_id'] );
-		$settings['api_key']      = self::encrypt_secret( (string) $result['api_key'] );
-		update_option( self::OPTION_KEY, $settings );
+		// Wrapped so a server-side failure surfaces as a clean message instead of
+		// a fatal/white screen (the provisioning token has already been consumed).
+		try {
+			$settings                 = self::get_settings();
+			$settings['api_base_url'] = $api_base_url;
+			$settings['site_id']      = sanitize_text_field( (string) $result['site_id'] );
+			$settings['api_key']      = self::encrypt_secret( (string) $result['api_key'] );
+			update_option( self::OPTION_KEY, $settings );
+		} catch ( \Throwable $e ) {
+			$this->redirect_after_connect( false, __( 'Connected to Bono, but saving the credentials failed on this server. Generate a new token and try again, or configure manually.', 'bono-leads-connector' ) );
+		}
 
 		$this->redirect_after_connect( true, __( 'Connected to Bono successfully. Leads from this site will now be delivered.', 'bono-leads-connector' ) );
 	}
