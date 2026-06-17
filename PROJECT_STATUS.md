@@ -34,11 +34,11 @@ installed as part of onboarding a Bono customer.
 - **API key encrypted at rest** with libsodium (key derived from `wp_salt` via HKDF;
   envelope prefix `bono:enc:v1:`); transparent migration of legacy plaintext.
 
-### Self-update (private channel)
-- Bundles `plugin-update-checker`; reads release ZIPs from a **public distribution repo**
-  (`bono-wordpress-plugin-dist`) tokenlessly. `bono-leads-connector.php`
+### Self-update
+- Bundles `plugin-update-checker`; reads release ZIPs from **this public repo's Releases**
+  tokenlessly. `bono-leads-connector.php`
 - `.github/workflows/release.yml` builds a clean ZIP on a `v*` tag and publishes the
-  Release to the dist repo. **Requires one-time operator setup — see §4.**
+  Release to this repo via the built-in `GITHUB_TOKEN`. **Requires the repo to be public — see §4.**
 
 ### Observability
 - **Structured JSON logging** (gated behind a debug flag; PII never logged).
@@ -87,16 +87,16 @@ composer phpstan            # static analysis (level 5)
 
 ---
 
-## 4. ⚠️ Operator setup required to activate auto-updates
+## 4. ⚠️ Setup required to activate auto-updates
 
-These are one-time GitHub-admin tasks (owner-level), not code:
+One-time:
 
-1. Create a **public** repo `LET-GROUP-LTD/bono-wordpress-plugin-dist` (with an initial README commit).
-2. Add a repo secret `DIST_REPO_TOKEN` to **this** repo — a fine-grained PAT with
-   **Contents: read+write on the dist repo only** (the default `GITHUB_TOKEN` can't write cross-repo).
-3. Cut the first release: `git tag v0.6.0 && git push origin v0.6.0` → `release.yml` publishes the ZIP.
+1. Make this repo (`LET-GROUP-LTD/bono-wordpress-plugin`) **public** so client sites can read
+   its Releases tokenlessly (Settings → General → Danger Zone → Change repository visibility).
+2. Cut the first release: `git tag v0.6.0 && git push origin v0.6.0` → `release.yml` builds the
+   ZIP and publishes it to this repo's Releases via the built-in `GITHUB_TOKEN`.
 
-Until this is done, the plugin works fully but cannot self-update.
+Until the repo is public, the plugin works fully but cannot self-update.
 
 ---
 
