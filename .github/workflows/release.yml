@@ -1,16 +1,29 @@
 name: Release
 
-# Builds a distributable plugin ZIP and publishes it as a GitHub Release on THIS
-# (public) repo. Client sites read this repo's Releases tokenless via
-# plugin-update-checker, so no separate distribution repo or PAT is needed —
-# the built-in GITHUB_TOKEN publishes the release to the current repository.
+# Two ways to cut a release, both publish a built ZIP to THIS repo's Releases
+# (read tokenlessly by client sites via plugin-update-checker):
 #
-# Trigger: push a tag like v0.6.0. The tag (minus the leading "v") must match both
-# the plugin header "Version:" and the BONO_PLUGIN_VERSION constant, or the build
-# fails fast — this prevents shipping a ZIP whose internal version disagrees with
-# the release, which would make WordPress see an endless "update available".
+#   1. One-click (recommended): Actions -> Release -> "Run workflow" -> pick
+#      patch / minor / major. The workflow bumps the version in the plugin file,
+#      commits it to main, tags it, builds the ZIP, and publishes the release.
+#
+#   2. Manual tag (fallback): bump the version in bono-leads-connector.php yourself,
+#      then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+#
+# The built-in GITHUB_TOKEN publishes to the current repo, so no PAT is required.
 
 on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Semantic version bump'
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
   push:
     tags:
       - 'v*'
@@ -18,17 +31,61 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     env:
       PLUGIN_SLUG: bono-leads-connector
     steps:
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
-      - name: Verify tag matches plugin version
+      - name: Bump version, commit, tag (one-click path)
+        if: github.event_name == 'workflow_dispatch'
+        id: bump
         run: |
+          set -euo pipefail
+          CUR="$(grep -oiP '(?<=\*\s)Version:\s*\K[0-9][0-9A-Za-z.\-]*' "${PLUGIN_SLUG}.php" | head -n1)"
+          IFS='.' read -r MA MI PA <<< "$CUR"
+          case "${{ inputs.bump }}" in
+            major) MA=$((MA + 1)); MI=0; PA=0 ;;
+            minor) MI=$((MI + 1)); PA=0 ;;
+            patch) PA=$((PA + 1)) ;;
+          esac
+          NEW="${MA}.${MI}.${PA}"
+          echo "Bumping ${CUR} -> ${NEW}"
+          sed -i -E "s|^( \* Version: ).*|\1${NEW}|" "${PLUGIN_SLUG}.php"
+          sed -i -E "s|(BONO_PLUGIN_VERSION', ')[0-9][0-9A-Za-z.\-]*|\1${NEW}|" "${PLUGIN_SLUG}.php"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add "${PLUGIN_SLUG}.php"
+          git commit -m "chore(release): v${NEW}"
+          git push origin main
+          git tag "v${NEW}"
+          git push origin "v${NEW}"
+          echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release tag
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = 'workflow_dispatch' ]; then
+            echo "tag=${{ steps.bump.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify tag matches plugin version (manual-tag path)
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           HEADER_VERSION="$(grep -oiP '(?<=\*\s)Version:\s*\K[0-9][0-9A-Za-z.\-]*' "${PLUGIN_SLUG}.php" | head -n1)"
           CONST_VERSION="$(grep -oP "BONO_PLUGIN_VERSION',\s*'\K[0-9][0-9A-Za-z.\-]*" "${PLUGIN_SLUG}.php" | head -n1)"
@@ -57,9 +114,13 @@ jobs:
             --exclude='.github' \
             --exclude='build' \
             --exclude='tests' \
+            --exclude='tests-integration' \
             --exclude='node_modules' \
             --exclude='composer.json' \
             --exclude='composer.lock' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
+            --exclude='.wp-env.json' \
             --exclude='phpunit.xml.dist' \
             --exclude='phpcs.xml.dist' \
             --exclude='phpstan.neon.dist' \
@@ -81,7 +142,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           files: build/${{ env.PLUGIN_SLUG }}.zip
           fail_on_unmatched_files: true
