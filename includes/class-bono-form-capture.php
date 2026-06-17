@@ -124,6 +124,21 @@ class Bono_Form_Capture {
 		$normalized = array();
 
 		foreach ( $fields as $key => $value ) {
+			if ( is_array( $value ) ) {
+				// Composite/nested provider fields (e.g. Fluent Forms' `names` =>
+				// [first_name, last_name], address groups) arrive nested. Flatten the
+				// scalar leaves so the contact heuristic can see sub-keys like
+				// first_name/last_name, and so the payload `fields` stays a flat string
+				// map (the Bono API requires string => string).
+				foreach ( $this->flatten_scalar_leaves( $key, $value ) as $leaf_key => $leaf_value ) {
+					if ( '' !== $leaf_key && ! isset( $normalized[ $leaf_key ] ) ) {
+						$normalized[ $leaf_key ] = $leaf_value;
+					}
+				}
+
+				continue;
+			}
+
 			$field_key = $this->normalize_field_key( $key );
 
 			if ( '' === $field_key ) {
@@ -134,6 +149,60 @@ class Bono_Form_Capture {
 		}
 
 		return $normalized;
+	}
+
+	/**
+	 * Flatten a nested field value to scalar leaves keyed for heuristic detection.
+	 *
+	 * Associative sub-keys (first_name, last_name, ...) surface as top-level keys so
+	 * composite name/address fields become detectable. List (numeric) entries collapse
+	 * into the parent key joined by spaces. Returns a flat key => string map.
+	 *
+	 * @param int|string $parent_key Parent field key.
+	 * @param array      $value      Nested field value.
+	 * @return array
+	 */
+	private function flatten_scalar_leaves( $parent_key, array $value ) {
+		$leaves     = array();
+		$list_parts = array();
+
+		foreach ( $value as $sub_key => $sub_value ) {
+			if ( is_array( $sub_value ) ) {
+				foreach ( $this->flatten_scalar_leaves( $sub_key, $sub_value ) as $nested_key => $nested_value ) {
+					if ( ! isset( $leaves[ $nested_key ] ) ) {
+						$leaves[ $nested_key ] = $nested_value;
+					}
+				}
+
+				continue;
+			}
+
+			$scalar = $this->normalize_scalar_value( $sub_value );
+
+			if ( '' === $scalar ) {
+				continue;
+			}
+
+			$sub_field_key = is_string( $sub_key ) ? $this->normalize_field_key( $sub_key ) : '';
+
+			if ( '' !== $sub_field_key ) {
+				if ( ! isset( $leaves[ $sub_field_key ] ) ) {
+					$leaves[ $sub_field_key ] = $scalar;
+				}
+			} else {
+				$list_parts[] = $scalar;
+			}
+		}
+
+		if ( ! empty( $list_parts ) ) {
+			$parent_field_key = $this->normalize_field_key( (string) $parent_key );
+
+			if ( '' !== $parent_field_key && ! isset( $leaves[ $parent_field_key ] ) ) {
+				$leaves[ $parent_field_key ] = implode( ' ', $list_parts );
+			}
+		}
+
+		return $leaves;
 	}
 
 	/**

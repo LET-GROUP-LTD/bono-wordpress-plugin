@@ -160,6 +160,26 @@ class CapturePipelineTest extends TestCase {
         $this->assertSame('0501234567', $spy->sent['contact']['phone']);
     }
 
+    public function test_fluent_detects_nested_composite_name() {
+        // Fluent Forms' default Contact Form sends the name as a nested composite
+        // (`names` => [first_name, last_name]). The contact heuristic must see the
+        // sub-keys, and the payload `fields` must stay a flat string map.
+        $spy = new SpyFluent(new Bono_API_Client());
+        $form = (object) array('id' => 7, 'title' => 'Lead Form');
+        $spy->handle_submission_inserted(101, array(
+            'names' => array('first_name' => 'Dana', 'last_name' => 'Cohen'),
+            'email' => 'dana@example.com',
+            'phone' => '0501234567',
+        ), $form);
+
+        $this->assertSame('Dana Cohen', $spy->sent['contact']['name']);
+        $this->assertTrue($spy->sent['validation']['isValid']);
+        // Flat string map only — no nested arrays survive into the payload fields.
+        foreach ($spy->sent['fields'] as $value) {
+            $this->assertIsNotArray($value);
+        }
+    }
+
     public function test_forminator_flattens_name_value_pairs() {
         $spy = new SpyForminator(new Bono_API_Client());
         $field_data = array(
