@@ -48,8 +48,8 @@
       if (typeof value !== 'string') {
         return; // skip files
       }
-      if (key === '_bono_nonce' || /pass(word)?/i.test(key)) {
-        return; // skip nonces and password-like fields
+      if (key === '_bono_token' || key === '_bono_nonce' || /pass(word)?/i.test(key)) {
+        return; // skip our token and password-like fields
       }
       if (data[key] === undefined) {
         data[key] = value;
@@ -81,12 +81,12 @@
       formName: form.getAttribute('aria-label') || form.getAttribute('name') || '',
       pageUrl: window.location.href,
       fields: fields,
-      _bono_nonce: cfg.nonce
+      _bono_token: cfg.token
     };
     try {
       fetch(cfg.restUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Bono-Nonce': cfg.nonce },
+        headers: { 'Content-Type': 'application/json', 'X-Bono-Token': cfg.token },
         body: JSON.stringify(payload),
         keepalive: true,
         credentials: 'same-origin'

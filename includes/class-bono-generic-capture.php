@@ -52,10 +52,77 @@ class Bono_Generic_Capture extends Bono_Form_Capture {
 			'bonoGenericCapture',
 			array(
 				'restUrl'   => esc_url_raw( rest_url( self::REST_NAMESPACE . self::REST_ROUTE ) ),
-				'nonce'     => wp_create_nonce( self::NONCE_ACTION ),
+				'token'     => $this->mint_token(),
 				'selectors' => $selectors,
 			)
 		);
+	}
+
+	/**
+	 * TTL (seconds) for a capture token. Long enough to survive full-page caching
+	 * (LiteSpeed/Cloudflare), short enough to bound replay. Overridable via constant.
+	 *
+	 * @return int
+	 */
+	private function token_ttl() {
+		if ( defined( 'BONO_GENERIC_TOKEN_TTL' ) && (int) BONO_GENERIC_TOKEN_TTL > 0 ) {
+			return (int) BONO_GENERIC_TOKEN_TTL;
+		}
+
+		return 7 * ( defined( 'DAY_IN_SECONDS' ) ? DAY_IN_SECONDS : 86400 );
+	}
+
+	/**
+	 * Per-site signing secret for capture tokens, derived from a WP salt (stable,
+	 * no DB write, not session-bound). Falls back gracefully if salts are absent.
+	 *
+	 * @return string
+	 */
+	private function token_secret() {
+		$salt = function_exists( 'wp_salt' ) ? (string) wp_salt( 'auth' ) : '';
+
+		return hash_hmac( 'sha256', 'bono-generic-capture-token', $salt );
+	}
+
+	/**
+	 * Mint a cache-safe, session-independent capture token: `<expiryEpoch>.<hmac>`.
+	 * Unlike a WP nonce it verifies for logged-in AND logged-out visitors and on
+	 * cached pages (until expiry), so generic capture never silently drops a lead.
+	 *
+	 * @param int|null $ttl Optional TTL override (seconds).
+	 * @return string
+	 */
+	public function mint_token( $ttl = null ) {
+		$expiry = time() + ( null === $ttl ? $this->token_ttl() : (int) $ttl );
+		$sig    = hash_hmac( 'sha256', (string) $expiry, $this->token_secret() );
+
+		return $expiry . '.' . $sig;
+	}
+
+	/**
+	 * Verify a capture token: signature matches (constant-time) and not expired.
+	 *
+	 * @param mixed $token Token string.
+	 * @return bool
+	 */
+	public function verify_token( $token ) {
+		if ( ! is_string( $token ) || false === strpos( $token, '.' ) ) {
+			return false;
+		}
+
+		list( $expiry, $sig ) = explode( '.', $token, 2 );
+
+		if ( '' === $expiry || ! ctype_digit( $expiry ) ) {
+			return false;
+		}
+
+		$expected = hash_hmac( 'sha256', (string) (int) $expiry, $this->token_secret() );
+
+		if ( ! hash_equals( $expected, (string) $sig ) ) {
+			return false;
+		}
+
+		return time() <= (int) $expiry;
 	}
 
 	/**
@@ -82,15 +149,15 @@ class Bono_Generic_Capture extends Bono_Form_Capture {
 	 * @return bool|WP_Error
 	 */
 	public function verify_request( $request ) {
-		$nonce = (string) $request->get_param( '_bono_nonce' );
+		$token = (string) $request->get_param( '_bono_token' );
 
-		if ( '' === $nonce ) {
-			$nonce = (string) $request->get_header( 'X-Bono-Nonce' );
+		if ( '' === $token ) {
+			$token = (string) $request->get_header( 'X-Bono-Token' );
 		}
 
-		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
+		if ( ! $this->verify_token( $token ) ) {
 			return new WP_Error(
-				'bono_invalid_nonce',
+				'bono_invalid_token',
 				__( 'Invalid or expired capture token.', 'bono-leads-connector' ),
 				array( 'status' => 403 )
 			);
