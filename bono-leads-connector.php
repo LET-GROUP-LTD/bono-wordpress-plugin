@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Bono Leads Connector
  * Description: Captures WordPress form submissions and sends them to Bono.
- * Version: 0.6.2
+ * Version: 0.6.3
  * Author: Bono
  * Requires PHP: 7.4
  * Text Domain: bono-leads-connector
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BONO_PLUGIN_VERSION', '0.6.2' );
+define( 'BONO_PLUGIN_VERSION', '0.6.3' );
 define( 'BONO_PLUGIN_FILE', __FILE__ );
 define( 'BONO_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BONO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
