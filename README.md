@@ -120,14 +120,14 @@ Example normalized payload fields:
 ```json
 {
   "fields": {
-    "your-name": "Tal Ohana",
-    "your-email": "tal@example.com",
-    "your-phone": "054-444-3618"
+    "your-name": "Dana Cohen",
+    "your-email": "dana@example.com",
+    "your-phone": "050-000-0000"
   },
   "contact": {
-    "name": "Tal Ohana",
-    "email": "tal@example.com",
-    "phone": "0544443618"
+    "name": "Dana Cohen",
+    "email": "dana@example.com",
+    "phone": "0500000000"
   },
   "validation": {
     "isValid": true,
