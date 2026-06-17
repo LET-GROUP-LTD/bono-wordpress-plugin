@@ -1,4 +1,4 @@
 <?php
-// Mint a valid nonce for the generic-capture REST route and print it.
-$action = Bono_Generic_Capture::NONCE_ACTION; // 'bono_generic_capture'
-echo wp_create_nonce( $action );
+// Mint a valid cache-safe capture token for the generic-capture REST route and print it.
+$cap = new Bono_Generic_Capture( new Bono_API_Client() );
+echo $cap->mint_token();

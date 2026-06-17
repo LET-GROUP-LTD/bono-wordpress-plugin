@@ -13,21 +13,21 @@ const RUN_ID = Date.now();
 
 beforeEach(async () => { await resetMock(); });
 
-async function mintNonce() {
+async function mintToken() {
   const { stdout } = await exec(WP_ENV_BIN, [
     'run', 'cli', '--env-cwd=wp-content/plugins/bono-leads-connector',
-    'wp', 'eval-file', 'tests-integration/triggers/generic-nonce.php',
+    'wp', 'eval-file', 'tests-integration/triggers/generic-token.php',
   ]);
   return stdout.trim();
 }
 
-test('Generic capture via REST + nonce → normalized payload', async () => {
-  const nonce = await mintNonce();
+test('Generic capture via REST + token → normalized payload', async () => {
+  const token = await mintToken();
   const res = await fetch(`${WP}/index.php?rest_route=/bono/v1/capture`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Bono-Nonce': nonce },
+    headers: { 'Content-Type': 'application/json', 'X-Bono-Token': token },
     body: JSON.stringify({
-      _bono_nonce: nonce,
+      _bono_token: token,
       // The callback reads formId (camelCase) — not form_id.
       formId: '7',
       formName: 'Bono Generic Test',
@@ -48,12 +48,12 @@ test('Generic capture via REST + nonce → normalized payload', async () => {
   assert.equal(p.contact.email, `gen-${RUN_ID}@example.com`);
 });
 
-test('Generic capture rejects a bad nonce', async () => {
+test('Generic capture rejects a bad token', async () => {
   const res = await fetch(`${WP}/index.php?rest_route=/bono/v1/capture`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Bono-Nonce': 'bogus' },
+    headers: { 'Content-Type': 'application/json', 'X-Bono-Token': 'bogus' },
     body: JSON.stringify({
-      _bono_nonce: 'bogus',
+      _bono_token: 'bogus',
       formId: '7',
       fields: { name: 'x', email: 'y@z.com' },
     }),
