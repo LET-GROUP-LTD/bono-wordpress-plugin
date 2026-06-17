@@ -11,6 +11,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Bono_API_Client {
 	/**
+	 * Force map-typed payload fields ('utm', 'fields') to encode as JSON objects.
+	 *
+	 * An empty PHP array encodes as `[]`, but the Bono API expects an object (`{}`).
+	 * This matters on the durable-queue retry path: a stored `{}` becomes an empty PHP
+	 * array after json_decode( $payload, true ) and would otherwise re-send as `[]`,
+	 * which the API rejects with a 400 — silently dropping the queued lead.
+	 *
+	 * @param array $payload Submission payload.
+	 * @return array
+	 */
+	public static function normalize_map_fields( array $payload ) {
+		foreach ( array( 'utm', 'fields' ) as $key ) {
+			if ( isset( $payload[ $key ] ) && is_array( $payload[ $key ] ) && empty( $payload[ $key ] ) ) {
+				$payload[ $key ] = new stdClass();
+			}
+		}
+
+		return $payload;
+	}
+
+	/**
 	 * Send a normalized submission payload to Bono.
 	 *
 	 * @param array $payload Normalized submission payload.
@@ -312,6 +333,9 @@ class Bono_API_Client {
 		$reject_unsafe_urls = ! $this->is_allowed_local_development_api_base_url(
 			isset( $settings['api_base_url'] ) ? $settings['api_base_url'] : ''
 		);
+
+		// Keep map-typed fields as JSON objects ({}), even after a queue round-trip flattened them.
+		$payload = self::normalize_map_fields( $payload );
 
 		$response = wp_remote_post(
 			$endpoint,
